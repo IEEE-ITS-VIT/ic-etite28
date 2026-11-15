@@ -1,6 +1,6 @@
 import { all, first } from "@/lib/db";
 import { getSmtpSettings, sentInLast24h, smtpConfig } from "@/lib/email/mailer";
-import { clearOutboxAction, retryFailedAction, saveOtpSmtpAction, saveSmtpAction, sendTestEmailAction } from "@/app/actions/admin-email";
+import { clearOutboxAction, resendEmailAction, retryFailedAction, saveOtpSmtpAction, saveSmtpAction, sendTestEmailAction } from "@/app/actions/admin-email";
 import { fmtIst } from "@/lib/portal/actions";
 import OutboxRunner from "@/components/admin/OutboxRunner";
 import { NOTIFICATION_DEFS, NOTIFICATION_KEYS, getNotificationTemplates } from "@/lib/notifications";
@@ -23,6 +23,9 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
     ),
     getNotificationTemplates(),
   ]);
+  const failedRows = await all<{ id: string; to_email: string; subject: string; error: string | null; created_at: string }>(
+    "SELECT id, to_email, subject, error, created_at FROM email_outbox WHERE status = 'failed' AND channel = 'main' ORDER BY created_at DESC LIMIT 200"
+  );
   const [sent24, otpSent24] = await Promise.all([sentInLast24h(mainCfg.user || undefined), sentInLast24h(otpCfg.user || undefined)]);
   const otpEnv = Boolean(process.env.SMTP_OTP_USER && process.env.SMTP_OTP_PASS);
   const otpOwn = !otpCfg.sharesMain;
@@ -48,7 +51,7 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
         <Card title="Send queue">
           <OutboxRunner queued={counts?.queued ?? 0} />
           <p className="mt-3 text-sm text-slate-500">
-            Verification codes and password resets are sent instantly through the OTP account (below). Bulk emails (qualification, results, certificates) wait here until you send them; anything over the daily limit goes out automatically the next day.
+            Verification codes and password resets are sent instantly through the OTP account (below). Bulk emails (qualification, results, certificates) wait here until you send them; anything over the daily limit stays queued and goes out automatically the next day, and failed emails are retried by the same daily job.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
             <form action={retryFailedAction}>
@@ -203,6 +206,40 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
           <SubmitButton pendingText="Saving…">Save notices</SubmitButton>
         </form>
       </Card>
+
+      {failedRows.length > 0 && (
+        <Card
+          title={`Failed emails (${failedRows.length})`}
+          className="mt-6"
+          actions={
+            <form action={retryFailedAction}>
+              <SubmitButton className={btnSecondary}>Resend all</SubmitButton>
+            </form>
+          }
+        >
+          <p className="mb-3 text-sm text-slate-500">
+            These could not be delivered after 3 tries. Fix the cause if needed (wrong address, SMTP settings) and resend. The daily job also retries failed emails automatically for a few days.
+          </p>
+          <Table head={["To", "Subject", "Error", "Queued", ""]}>
+            {failedRows.map((m) => (
+              <tr key={m.id}>
+                <Td>{m.to_email}</Td>
+                <Td>{m.subject}</Td>
+                <Td className="max-w-xs text-xs text-red-600">{m.error}</Td>
+                <Td className="whitespace-nowrap text-xs">{fmtIst(m.created_at)}</Td>
+                <Td className="text-right">
+                  <form action={resendEmailAction}>
+                    <input type="hidden" name="id" value={m.id} />
+                    <SubmitButton className={btnSecondary} pendingText="Sending…">
+                      Resend
+                    </SubmitButton>
+                  </form>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
 
       <Card title="Recent emails" className="mt-6">
         {recent.length === 0 ? (

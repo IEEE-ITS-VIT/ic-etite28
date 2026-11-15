@@ -94,8 +94,23 @@ export async function sendTestEmailAction(fd: FormData) {
 export async function retryFailedAction() {
   await requireAdmin();
   await guarded(BACK, async () => {
-    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE status = 'failed'");
-    return `${res.changes} failed email(s) re-queued.`;
+    // Expired codes / reset links are not resent: the user requests a new one.
+    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE status = 'failed' AND channel = 'main'");
+    return `${res.changes} failed email(s) re-queued. Click “Send queued emails” to send them now.`;
+  });
+}
+
+// Resend one failed email right away.
+export async function resendEmailAction(fd: FormData) {
+  await requireAdmin();
+  await guarded(BACK, async () => {
+    const id = str(fd, "id", 60);
+    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE id = ? AND status = 'failed' AND channel = 'main'", [id]);
+    if (res.changes === 0) throw new PortalError("That email is not in the failed list any more.");
+    const out = await processOutbox(1, id);
+    if (out.sent === 1) return "Email resent.";
+    if (out.quotaHit || out.dailyRemaining <= 0) return "Daily sending limit reached: the email is queued and will be sent automatically tomorrow.";
+    throw new PortalError(`Still could not send it${out.lastError ? `: ${out.lastError.slice(0, 200)}` : "."} It stays queued and will be retried.`);
   });
 }
 

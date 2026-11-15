@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
-import { processOutbox } from "@/lib/email/mailer";
+import { processOutbox, requeueRecentFailures } from "@/lib/email/mailer";
 
 export const maxDuration = 60;
 
-// Vercel Cron (vercel.json) drains whatever the admin left queued, e.g. when the daily
-// Gmail quota was reached. Vercel sends `Authorization: Bearer $CRON_SECRET`.
+// Vercel Cron (vercel.json), once a day: sends whatever is still queued (e.g. because the
+// daily Gmail quota was reached) and retries emails that failed in the last few days. Vercel sends `Authorization: Bearer $CRON_SECRET`.
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const started = Date.now();
+  const requeued = await requeueRecentFailures();
   let total = 0;
   let last = await processOutbox(20);
   total += last.sent;
@@ -18,5 +19,5 @@ export async function GET(req: Request) {
     last = await processOutbox(20);
     total += last.sent;
   }
-  return NextResponse.json({ sent: total, remainingQueued: last.remainingQueued, dailyRemaining: last.dailyRemaining });
+  return NextResponse.json({ sent: total, requeued, remainingQueued: last.remainingQueued, dailyRemaining: last.dailyRemaining });
 }

@@ -202,8 +202,12 @@ export interface ProcessResult {
   dailyRemaining: number; // main account
   otpDailyRemaining: number;
   smtpConfigured: boolean;
+  quotaHit?: boolean; // the SMTP provider itself refused for quota reasons
   lastError?: string;
 }
+
+// Provider replies that mean "daily sending limit reached" (Gmail: 550 5.4.5 / 4.7.28 …).
+const QUOTA_ERROR = /5\.4\.5|4\.7\.28|quota|sending limit|limit exceeded|too many messages/i;
 
 const MAX_ATTEMPTS = 3;
 // A code (15 min) or reset link (30 min) that could not go out in time is useless later.
@@ -244,7 +248,15 @@ export async function processOutbox(limit = 20, onlyId?: string): Promise<Proces
           socketTimeout: 15000,
         });
         for (const row of rows) {
-          if (await sendRow(transport, cfg, row, result)) remaining--;
+          const outcome = await sendRow(transport, cfg, row, result);
+          if (outcome === "sent") remaining--;
+          if (outcome === "quota") {
+            // The provider says this account is out of quota: stop here. The rest stays
+            // queued and the daily cron sends it once the quota is back.
+            remaining = 0;
+            result.quotaHit = true;
+            break;
+          }
         }
       }
     }
@@ -257,9 +269,9 @@ export async function processOutbox(limit = 20, onlyId?: string): Promise<Proces
   return result;
 }
 
-async function sendRow(transport: nodemailer.Transporter, cfg: SmtpConfig, row: OutboxRow, result: ProcessResult): Promise<boolean> {
+async function sendRow(transport: nodemailer.Transporter, cfg: SmtpConfig, row: OutboxRow, result: ProcessResult): Promise<"sent" | "failed" | "quota" | "skipped"> {
   const claim = await run("UPDATE email_outbox SET attempts = attempts + 1 WHERE id = ? AND status = 'queued' AND attempts = ?", [row.id, row.attempts]);
-  if (claim.changes === 0) return false;
+  if (claim.changes === 0) return "skipped";
   try {
     const attachments = [];
     // Attachments are rendered at send time; nothing is stored.
@@ -285,18 +297,36 @@ async function sendRow(transport: nodemailer.Transporter, cfg: SmtpConfig, row: 
     });
     await run("UPDATE email_outbox SET status = 'sent', sent_at = ?, error = NULL, smtp_user = ? WHERE id = ?", [now(), cfg.user.toLowerCase(), row.id]);
     result.sent++;
-    return true;
+    return "sent";
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.lastError = message;
+    if (QUOTA_ERROR.test(message)) {
+      // Not this email's fault: keep it queued and don't count the attempt.
+      await run("UPDATE email_outbox SET attempts = MAX(0, attempts - 1), error = ? WHERE id = ?", [
+        `Waiting: the email account's daily sending limit was reached. It will be sent automatically. (${message.slice(0, 300)})`,
+        row.id,
+      ]);
+      return "quota";
+    }
     result.failed++;
     await run("UPDATE email_outbox SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'queued' END, error = ? WHERE id = ?", [
       MAX_ATTEMPTS,
       message.slice(0, 500),
       row.id,
     ]);
-    return false;
+    return "failed";
   }
+}
+
+// Daily safety net (cron): gives failed emails from the last few days another go. Codes and
+// reset links are skipped (they have expired) and nothing is retried more than a few times.
+export async function requeueRecentFailures(): Promise<number> {
+  const res = await run(
+    "UPDATE email_outbox SET status = 'queued' WHERE status = 'failed' AND channel = 'main' AND attempts < ? AND created_at > ?",
+    [MAX_ATTEMPTS + 3, new Date(Date.now() - 4 * 864e5).toISOString()]
+  );
+  return res.changes;
 }
 
 // Transactional mail (verification codes, password resets): sent immediately through the
