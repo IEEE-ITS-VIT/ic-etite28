@@ -1,3 +1,4 @@
+import { SITE, SITES, SITE_NAME } from "@/lib/site";
 import Link from "next/link";
 import { ArrowRight, Award, ClipboardCheck, Settings2, Store, Ticket, Trophy } from "lucide-react";
 import { all, first } from "@/lib/db";
@@ -43,18 +44,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
   // Certificates from admin Excel batches, matched to this login's (verified) email.
   const batchCerts = await all<{ id: string; batch_id: string; title: string; event_label: string | null }>(
     `SELECT r.id, r.batch_id, b.title, b.event_label FROM certificate_batch_recipients r
-       JOIN certificate_batches b ON b.id = r.batch_id
+       JOIN certificate_batches b ON b.id = r.batch_id AND b.site = '${SITE}'
        JOIN certificate_templates t ON t.scope = 'batch:' || b.id AND t.released = 1
       WHERE r.email = ? ORDER BY b.created_at DESC`,
     [user.email]
   );
   const invoices = await all<{ id: string; number: string; amount: number; currency: string; issued_at: string; items: string }>(
-    "SELECT id, number, amount, currency, issued_at, items FROM invoices WHERE user_id = ? ORDER BY seq DESC",
-    [user.id]
+    `SELECT id, number, amount, currency, issued_at, items FROM invoices WHERE user_id = ? AND purpose IN (${SITES[SITE].payments.map(() => "?").join(",")}) ORDER BY seq DESC`,
+    [user.id, ...SITES[SITE].payments]
   );
 
   const certLinks = releasedCerts.filter(
-    (c) => (c.scope === "conference" && conference?.status === "confirmed") || (c.scope === "technext" && booking?.status === "approved")
+    (c) =>
+      (SITE === "icetite" && c.scope === "conference" && conference?.status === "confirmed") ||
+      (SITE === "technext" && c.scope === "technext" && booking?.status === "approved")
   );
   const openToJoin = openEvents.filter((e) => registrationWindow(e) === "open");
 
@@ -69,7 +72,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
               <Settings2 className="h-4 w-4" /> Admin portal
             </Link>
           )}
-          {(user.role === "evaluator" || user.role === "admin") && (
+          {SITE === "bolt" && (user.role === "evaluator" || user.role === "admin") && (
             <Link href="/evaluate" className={btnSecondary}>
               <ClipboardCheck className="h-4 w-4" /> Evaluate
             </Link>
@@ -86,6 +89,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
       <Flash ok={ok} error={error} />
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Conference registration */}
+        {SITE === "icetite" && (
         <Card title={<span className="flex items-center gap-2"><Ticket className="h-5 w-5 text-brand-secondary" /> ic-ETITE&apos;28 registration</span>}>
           {conference ? (
             <div className="space-y-3">
@@ -116,9 +120,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
             <Empty>Conference registration will open soon.</Empty>
           )}
         </Card>
+        )}
+
+        {/* The other two websites share this account */}
+        {SITE === "icetite" && (settings.visibility.bolt || settings.visibility.technext) && (
+          <Card title="BOLT 3.0 & TechNext '28">
+            <p className="text-sm text-slate-600">These have their own websites. Log in there with this same email and password.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {settings.visibility.bolt && (
+                <a href={settings.links.bolt} className={btnGold}>
+                  BOLT 3.0 hackathon <ArrowRight className="h-4 w-4" />
+                </a>
+              )}
+              {settings.visibility.technext && (
+                <a href={settings.links.technext} className={btnSecondary}>
+                  TechNext &apos;28 stalls <ArrowRight className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* TechNext */}
-        {(settings.visibility.technext || booking) && (
+        {SITE === "technext" && (
           <Card title={<span className="flex items-center gap-2"><Store className="h-5 w-5 text-[#F37021]" /> TechNext &apos;28 stall</span>}>
             {booking ? (
               <div className="space-y-3">
@@ -155,6 +179,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
         )}
 
         {/* Events */}
+        {SITE === "bolt" && (
         <Card title={<span className="flex items-center gap-2"><Trophy className="h-5 w-5 text-[#B45309]" /> My events</span>} className="lg:col-span-2">
           {myEvents.length === 0 ? (
             <Empty>You haven&apos;t registered for any events yet.</Empty>
@@ -191,6 +216,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
             </div>
           )}
         </Card>
+        )}
 
         {invoices.length > 0 && (
           <Card title="Invoices" className="lg:col-span-2">
@@ -217,7 +243,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
             <div className="flex flex-wrap gap-2">
               {certLinks.map((c) => (
                 <a key={`${c.scope}-${c.kind}`} href={`/api/certificates?scope=${c.scope}&kind=${c.kind}`} className={btnPrimary}>
-                  {c.scope === "conference" ? "ic-ETITE'28" : "TechNext '28"} {c.kind} certificate
+                  {SITE_NAME} {c.kind} certificate
                 </a>
               ))}
               {batchCerts.map((c) => (
@@ -226,7 +252,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
                 </a>
               ))}
             </div>
-            <p className="mt-3 text-sm text-slate-500">Event certificates are on each event&apos;s page.</p>
+            {SITE === "bolt" && <p className="mt-3 text-sm text-slate-500">Event certificates are on each event&apos;s page.</p>}
           </Card>
         )}
 

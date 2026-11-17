@@ -1,3 +1,4 @@
+import { SITE } from "@/lib/site";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all, first, parseJson } from "@/lib/db";
@@ -14,7 +15,7 @@ type SP = Promise<{ ok?: string; error?: string; q?: string }>;
 export default async function CertificateBatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SP }) {
   const { id } = await params;
   const { ok, error, q } = await searchParams;
-  const b = await first<{ id: string; title: string; event_label: string | null; issue_date: string | null; columns: string }>("SELECT * FROM certificate_batches WHERE id = ?", [id]);
+  const b = await first<{ id: string; title: string; event_label: string | null; issue_date: string | null; columns: string }>("SELECT * FROM certificate_batches WHERE id = ? AND site = ?", [id, SITE]);
   if (!b) notFound();
   const scope = `batch:${id}`;
   const back = `/admin/certificates/${id}`;

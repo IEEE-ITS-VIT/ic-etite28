@@ -142,6 +142,7 @@ export interface Settings {
   texts: TextOverrides; // inline page edits
   images: ImageOverrides;
   collections: Record<string, unknown[]>; // edited lists (Admin → Lists)
+  links: { icetite: string; bolt: string; technext: string }; // the three websites (Admin → Site content)
 }
 
 const shortTitles: Record<string, string> = {
@@ -231,6 +232,11 @@ export const DEFAULT_SETTINGS: Settings = {
   texts: {},
   images: {},
   collections: {},
+  links: {
+    icetite: process.env.NEXT_PUBLIC_ICETITE_URL || "https://ic-etite28.vercel.app",
+    bolt: process.env.NEXT_PUBLIC_BOLT_URL || "https://bolt-3-0.vercel.app",
+    technext: process.env.NEXT_PUBLIC_TECHNEXT_URL || "https://technext-3-0.vercel.app",
+  },
   ticker: {
     enabled: true,
     label: "Announcements",

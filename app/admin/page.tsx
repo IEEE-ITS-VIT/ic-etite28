@@ -4,6 +4,7 @@ import { first } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { isSmtpConfigured } from "@/lib/email/mailer";
 import { Card, PortalPage, Stat, StatusBadge } from "@/components/portal/ui";
+import { SITE, SITE_NAME } from "@/lib/site";
 
 export default async function AdminHome() {
   const [s, c, smtp] = await Promise.all([
@@ -16,7 +17,8 @@ export default async function AdminHome() {
               (SELECT COUNT(*) FROM technext_bookings WHERE status = 'pending') AS technext_pending,
               (SELECT COUNT(*) FROM conference_registrations) AS conf,
               (SELECT COUNT(*) FROM conference_registrations WHERE payment_status IN ('unpaid','pending')) AS conf_due,
-              (SELECT COUNT(*) FROM email_outbox WHERE status = 'queued') AS queued`
+              (SELECT COUNT(*) FROM email_outbox WHERE status = 'queued' AND site = ?) AS queued`,
+      [SITE]
     ),
     isSmtpConfigured(),
   ]);
@@ -32,12 +34,13 @@ export default async function AdminHome() {
   );
 
   return (
-    <PortalPage title="Admin portal" subtitle="Manage site content, events, registrations, emails and certificates." width="max-w-7xl">
+    <PortalPage title={`${SITE_NAME} admin portal`} subtitle="Manage this website's content, registrations, payments, emails and certificates." width="max-w-7xl">
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Accounts" value={c?.users ?? 0} />
-        <Stat label="Event registrations" value={c?.regs ?? 0} hint={`${c?.events ?? 0} active event(s)`} />
-        <Stat label="Conference" value={c?.conf ?? 0} hint={`${c?.conf_due ?? 0} payment(s) due`} />
-        <Stat label="TechNext stalls" value={c?.technext ?? 0} hint={`${c?.technext_pending ?? 0} awaiting review`} />
+        <Stat label="Accounts (all 3 sites)" value={c?.users ?? 0} />
+        {SITE === "bolt" && <Stat label="Event registrations" value={c?.regs ?? 0} hint={`${c?.events ?? 0} active event(s)`} />}
+        {SITE === "icetite" && <Stat label="Conference" value={c?.conf ?? 0} hint={`${c?.conf_due ?? 0} payment(s) due`} />}
+        {SITE === "technext" && <Stat label="Stall bookings" value={c?.technext ?? 0} hint={`${c?.technext_pending ?? 0} awaiting review`} />}
+        <Stat label="Emails queued" value={c?.queued ?? 0} />
       </div>
       {!smtp && (
         <p className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -48,19 +51,27 @@ export default async function AdminHome() {
         </p>
       )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {tile("/admin/settings", "Site content (CMS)", "Important dates, registration fees, BOLT/TechNext visibility, stall prices and payment links.")}
-        {tile("/admin/events", "Events & BOLT", "Create events, invite lists, teams, rounds, scoring, results, emails, certificates and exports.")}
-        {tile("/admin/technext", "TechNext stalls", `${c?.technext_pending ?? 0} booking(s) awaiting review.`)}
-        {tile("/admin/conference", "Conference registrations", `${c?.conf_due ?? 0} registration(s) with payment due.`)}
-        {tile("/admin/users", "Users & evaluators", "Roles, evaluator invitations and manual email verification.")}
+        {tile("/admin/settings", "Site content (CMS)", "Announcement bar, appearance, payments, invoice template and website links.")}
+        {tile("/admin/content", "Page content", "Edit every text and image on this website, with a live preview.")}
+        {SITE === "icetite" && tile("/admin/conference", "Conference registrations", `${c?.conf_due ?? 0} registration(s) with payment due.`)}
+        {SITE === "bolt" && tile("/admin/events", "Events & teams", "Create events, invite lists, teams, rounds, scoring, results, emails, certificates and exports.")}
+        {SITE === "technext" && tile("/admin/technext", "Stall bookings", `${c?.technext_pending ?? 0} booking(s) awaiting review.`)}
+        {tile("/admin/users", SITE === "bolt" ? "Users & evaluators" : "Users & roles", `Roles on ${SITE_NAME} only. Accounts are shared by all three websites.`)}
         {tile("/admin/email", "Email & SMTP", `${c?.queued ?? 0} email(s) queued.`)}
       </div>
-      <Card title="Public visibility" className="mt-6">
+      <Card title="Status" className="mt-6">
         <div className="flex flex-wrap gap-3 text-sm">
-          <span className="flex items-center gap-2">BOLT <StatusBadge status={s.visibility.bolt ? "public" : "hidden"} /></span>
-          <span className="flex items-center gap-2">TechNext <StatusBadge status={s.visibility.technext ? "public" : "hidden"} /></span>
-          <span className="flex items-center gap-2">Conference registration <StatusBadge status={s.visibility.conferenceRegistration ? "open" : "closed"} /></span>
-          <span className="flex items-center gap-2">Stall booking <StatusBadge status={s.visibility.technextRegistration ? "open" : "closed"} /></span>
+          {SITE === "icetite" && (
+            <>
+              <span className="flex items-center gap-2">BOLT badge <StatusBadge status={s.visibility.bolt ? "public" : "hidden"} /></span>
+              <span className="flex items-center gap-2">TechNext badge <StatusBadge status={s.visibility.technext ? "public" : "hidden"} /></span>
+              <span className="flex items-center gap-2">Conference registration <StatusBadge status={s.visibility.conferenceRegistration ? "open" : "closed"} /></span>
+            </>
+          )}
+          {SITE === "technext" && (
+            <span className="flex items-center gap-2">Stall booking <StatusBadge status={s.visibility.technextRegistration ? "open" : "closed"} /></span>
+          )}
+          {SITE === "bolt" && <span className="flex items-center gap-2">Home page event: <code className="text-xs">{s.bolt.eventSlug}</code></span>}
         </div>
       </Card>
     </PortalPage>

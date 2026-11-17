@@ -114,13 +114,17 @@ export async function saveFeesAction(fd: FormData) {
 export async function saveVisibilityAction(fd: FormData) {
   const admin = await requireAdmin(BACK);
   await guarded(BACK + "#visibility", async () => {
+    // Only the toggles this site's form shows are changed; the rest keep their value.
+    const shown = new Set(str(fd, "fields", 200).split(",").filter(Boolean));
+    const current = (await getSettings()).visibility;
+    const pick = (k: keyof typeof current) => (shown.has(k) ? bool(fd, k) : current[k]);
     await saveSetting(
       "visibility",
       {
-        bolt: bool(fd, "bolt"),
-        technext: bool(fd, "technext"),
-        conferenceRegistration: bool(fd, "conferenceRegistration"),
-        technextRegistration: bool(fd, "technextRegistration"),
+        bolt: pick("bolt"),
+        technext: pick("technext"),
+        conferenceRegistration: pick("conferenceRegistration"),
+        technextRegistration: pick("technextRegistration"),
       },
       admin.id
     );
@@ -168,7 +172,10 @@ export async function savePaymentsAction(fd: FormData) {
   const admin = await requireAdmin(BACK);
   await guarded(BACK + "#payments", async () => {
     const provider = str(fd, "provider", 10) === "vit" ? "vit" : "manual";
+    const current = (await getSettings()).payments;
     const link = (k: string) => {
+      // Fields this site doesn't show keep their saved value.
+      if (!fd.has(k)) return k === "conference_link" ? current.conferenceLink : current.technextLink;
       const v = str(fd, k, 500);
       if (v && !/^https?:\/\//i.test(v)) throw new PortalError("Payment links must start with http:// or https://");
       return v;
@@ -179,6 +186,21 @@ export async function savePaymentsAction(fd: FormData) {
       admin.id
     );
     return "Payment settings saved.";
+  });
+}
+
+// Addresses of the three websites (navbar badges, cards, "back to" links, redirects).
+export async function saveLinksAction(fd: FormData) {
+  const admin = await requireAdmin(BACK);
+  await guarded(BACK + "#links", async () => {
+    const url = (k: string) => {
+      const v = str(fd, k, 300).replace(/\/+$/, "");
+      if (!/^https?:\/\/[^\s/]+/i.test(v)) throw new PortalError("Each website address must start with http:// or https://");
+      return v;
+    };
+    await saveSetting("links", { icetite: url("icetite"), bolt: url("bolt"), technext: url("technext") }, admin.id);
+    refreshPublic();
+    return "Website links saved.";
   });
 }
 

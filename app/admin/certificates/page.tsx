@@ -1,3 +1,4 @@
+import { SITE } from "@/lib/site";
 import Link from "next/link";
 import { all } from "@/lib/db";
 import { fmtIst } from "@/lib/portal/actions";
@@ -12,7 +13,8 @@ export default async function CertificateBatchesPage({ searchParams }: { searchP
             (SELECT COUNT(*) FROM certificate_batch_recipients r WHERE r.batch_id = b.id) AS recipients,
             (SELECT COUNT(*) FROM certificate_batch_recipients r WHERE r.batch_id = b.id AND r.emailed_at IS NOT NULL) AS emailed,
             (SELECT released FROM certificate_templates t WHERE t.scope = 'batch:' || b.id) AS released
-       FROM certificate_batches b ORDER BY b.created_at DESC`
+       FROM certificate_batches b WHERE b.site = ? ORDER BY b.created_at DESC`,
+    [SITE]
   );
   return (
     <PortalPage

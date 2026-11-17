@@ -1,4 +1,5 @@
 "use server";
+import { SITE } from "@/lib/site";
 
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/session";
@@ -20,7 +21,7 @@ export async function createBatchAction(fd: FormData) {
       const title = str(fd, "title", 120);
       if (title.length < 3) throw new PortalError("Give the batch a title, e.g. 'Workshop on Quantum ML — participants'.");
       id = newId();
-      await run("INSERT INTO certificate_batches (id, title, event_label, issue_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", [
+      await run("INSERT INTO certificate_batches (id, title, event_label, issue_date, created_at, updated_at, site) VALUES (?, ?, ?, ?, ?, ?, '" + SITE + "')", [
         id,
         title,
         str(fd, "event_label", 150) || null,

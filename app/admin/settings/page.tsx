@@ -4,6 +4,7 @@ import {
   saveDatesAction,
   saveFeesAction,
   saveInvoiceTemplateAction,
+  saveLinksAction,
   savePaymentsAction,
   saveSponsorshipAction,
   saveTechnextAction,
@@ -16,6 +17,7 @@ import { FONT_OPTIONS } from "@/lib/fonts";
 import { THEME_COLORS } from "@/lib/settings";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Card, Field, Flash, PortalPage, inputCls } from "@/components/portal/ui";
+import { SITE, SITE_NAME } from "@/lib/site";
 
 const small = `${inputCls} !py-2 !text-sm`;
 const BLANK_ROWS = 2;
@@ -45,7 +47,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
   return (
     <PortalPage
       title="Site content (CMS)"
-      subtitle="Changes here update the public website within seconds: important dates, registration fees, section visibility, TechNext stalls and payment links."
+      subtitle={`Changes here update the ${SITE_NAME} website within seconds.`}
       width="max-w-7xl"
     >
       <Flash ok={ok} error={error} />
@@ -64,19 +66,31 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
         <Card title="Visibility">
           <form id="visibility" action={saveVisibilityAction} className="space-y-4 scroll-mt-28">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Toggle name="bolt" label="BOLT hackathon" hint="Shows the BOLT page, navbar badge and menu card." checked={s.visibility.bolt} />
-              <Toggle name="technext" label="TechNext expo" hint="Shows the TechNext page, navbar badge and menu card." checked={s.visibility.technext} />
-              <Toggle
-                name="conferenceRegistration"
-                label="Conference registration open"
-                hint="Shows the Register button on the Registration page and dashboard."
-                checked={s.visibility.conferenceRegistration}
-              />
-              <Toggle name="technextRegistration" label="TechNext stall booking open" hint="Lets exhibitors book stalls from the TechNext page." checked={s.visibility.technextRegistration} />
+              {SITE === "icetite" && (
+                <>
+                  <input type="hidden" name="fields" value="bolt,technext,conferenceRegistration" />
+                  <Toggle name="bolt" label="BOLT hackathon" hint="Shows the BOLT 3.0 navbar badge, menu card and links to the BOLT website." checked={s.visibility.bolt} />
+                  <Toggle name="technext" label="TechNext expo" hint="Shows the TechNext navbar badge, menu card and links to the TechNext website." checked={s.visibility.technext} />
+                  <Toggle
+                    name="conferenceRegistration"
+                    label="Conference registration open"
+                    hint="Shows the Register button on the Registration page and dashboard."
+                    checked={s.visibility.conferenceRegistration}
+                  />
+                </>
+              )}
+              {SITE === "technext" && (
+                <>
+                  <input type="hidden" name="fields" value="technextRegistration" />
+                  <Toggle name="technextRegistration" label="Stall booking open" hint="Lets exhibitors book stalls from the home page and dashboard." checked={s.visibility.technextRegistration} />
+                </>
+              )}
             </div>
-            <Field label="BOLT event slug" hint="The portal event that the BOLT page's Register button opens (Events & BOLT → event URL).">
-              <input name="bolt_slug" defaultValue={s.bolt.eventSlug} className={`${inputCls} max-w-sm`} />
-            </Field>
+            {SITE === "bolt" && (
+              <Field label="BOLT event slug" hint="The portal event that the home page's Register button opens (Events → event URL).">
+                <input name="bolt_slug" defaultValue={s.bolt.eventSlug} className={`${inputCls} max-w-sm`} />
+              </Field>
+            )}
             <SubmitButton pendingText="Saving…">Save visibility</SubmitButton>
           </form>
         </Card>
@@ -123,6 +137,29 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           </form>
         </Card>
 
+        <Card title="Website links">
+          <form id="links" action={saveLinksAction} className="space-y-4 scroll-mt-28">
+            <p className="text-sm text-slate-500">
+              ic-ETITE&apos;28, BOLT 3.0 and TechNext &apos;28 are separate websites that share one login. These addresses are used for the navbar badges, cards and
+              &ldquo;back to&rdquo; links between them (and the old /hackathon and /technext pages of ic-ETITE redirect to them).
+            </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Field label="ic-ETITE'28 website">
+                <input name="icetite" type="url" defaultValue={s.links.icetite} required className={inputCls} />
+              </Field>
+              <Field label="BOLT 3.0 website">
+                <input name="bolt" type="url" defaultValue={s.links.bolt} required className={inputCls} />
+              </Field>
+              <Field label="TechNext '28 website">
+                <input name="technext" type="url" defaultValue={s.links.technext} required className={inputCls} />
+              </Field>
+            </div>
+            <SubmitButton pendingText="Saving…">Save links</SubmitButton>
+          </form>
+        </Card>
+
+        {SITE === "icetite" && (
+        <>
         <Card title="Important dates">
           <form id="dates" action={saveDatesAction} className="space-y-4 scroll-mt-28">
             <input type="hidden" name="date_count" value={dateRows.length} />
@@ -213,7 +250,10 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             <SubmitButton pendingText="Saving…">Save conference settings</SubmitButton>
           </form>
         </Card>
+        </>
+        )}
 
+        {SITE === "technext" && (
         <Card title="TechNext stalls">
           <form id="technext" action={saveTechnextAction} className="space-y-4 scroll-mt-28">
             <input type="hidden" name="stall_count" value={stallRows.length} />
@@ -250,6 +290,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             <SubmitButton pendingText="Saving…">Save TechNext options</SubmitButton>
           </form>
         </Card>
+        )}
 
         <Card title="Payments">
           <form id="payments" action={savePaymentsAction} className="space-y-4 scroll-mt-28">
@@ -261,21 +302,29 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
                 </select>
               </Field>
               <div />
-              <Field label="Conference payment link" hint="Payers are sent here with ?ref=<payment id>.">
-                <input name="conference_link" type="url" defaultValue={s.payments.conferenceLink} placeholder="https://" className={inputCls} />
-              </Field>
-              <Field label="TechNext payment link">
-                <input name="technext_link" type="url" defaultValue={s.payments.technextLink} placeholder="https://" className={inputCls} />
-              </Field>
+              {SITE === "icetite" && (
+                <Field label="Conference payment link" hint="Payers are sent here with ?ref=<payment id>.">
+                  <input name="conference_link" type="url" defaultValue={s.payments.conferenceLink} placeholder="https://" className={inputCls} />
+                </Field>
+              )}
+              {SITE === "technext" && (
+                <Field label="Stall payment link" hint="Payers are sent here with ?ref=<payment id>.">
+                  <input name="technext_link" type="url" defaultValue={s.payments.technextLink} placeholder="https://" className={inputCls} />
+                </Field>
+              )}
               <Field label="Instructions shown when no link is set" className="md:col-span-2">
                 <textarea name="instructions" rows={3} defaultValue={s.payments.instructions} className={inputCls} />
               </Field>
             </div>
-            <p className="text-sm text-slate-500">Each event has its own payment link (Events & BOLT → event settings), and any single registration can be given its own link from its admin page.</p>
+            <p className="text-sm text-slate-500">
+              This website has its own payment gateway: the provider set here and the VIT_PAYMENT_* keys of this deployment.
+              {SITE === "bolt" ? " Each event has its own payment link (Events → event settings)." : ""} Any single registration can also be given its own link from its admin page.
+            </p>
             <SubmitButton pendingText="Saving…">Save payment settings</SubmitButton>
           </form>
         </Card>
 
+        {SITE === "icetite" && (
         <Card title="Sponsorship packages">
           <form id="sponsorship" action={saveSponsorshipAction} className="space-y-4 scroll-mt-28">
             <input type="hidden" name="pkg_count" value={pkgRows.length} />
@@ -308,6 +357,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             <SubmitButton pendingText="Saving…">Save sponsorship packages</SubmitButton>
           </form>
         </Card>
+        )}
 
         <Card
           title="Invoice template"

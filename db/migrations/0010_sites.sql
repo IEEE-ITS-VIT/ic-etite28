@@ -14,3 +14,6 @@ INSERT OR IGNORE INTO site_roles (user_id, site, role, updated_at) SELECT id, 't
 -- Each site sends only its own queued emails.
 ALTER TABLE email_outbox ADD COLUMN site TEXT NOT NULL DEFAULT 'icetite';
 CREATE INDEX IF NOT EXISTS idx_outbox_site ON email_outbox(site, channel, status, priority, created_at);
+
+-- Certificate batches (Admin → Certificates from Excel) belong to the site that made them.
+ALTER TABLE certificate_batches ADD COLUMN site TEXT NOT NULL DEFAULT 'icetite';
