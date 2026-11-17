@@ -4,7 +4,7 @@ import { all, first, now, parseJson, run } from "@/lib/db";
 import { decrypt } from "@/lib/portal/crypto";
 import { newId } from "@/lib/portal/ids";
 import { SITE_URL } from "@/lib/seo";
-import { SITE, SITE_NAME, siteKey } from "@/lib/site";
+import { SITE, SITE_NAME } from "@/lib/site";
 
 // ─── SMTP configuration ────────────────────────────────────────────────
 // Two accounts, both set in /admin/email (passwords stored encrypted in D1):
@@ -14,7 +14,8 @@ import { SITE, SITE_NAME, siteKey } from "@/lib/site";
 // the same login. Each SMTP username has its own daily quota.
 
 export type SmtpChannel = "main" | "otp";
-const SETTING_KEY: Record<SmtpChannel, string> = { main: siteKey("smtp"), otp: siteKey("smtp_otp") };
+// Shared by ic-ETITE'28, BOLT 3.0 and TechNext '28: one SMTP setup (and one daily quota) for all three sites.
+const SETTING_KEY: Record<SmtpChannel, string> = { main: "smtp", otp: "smtp_otp" };
 
 export interface SmtpSettings {
   host: string;

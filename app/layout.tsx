@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { FONT_OPTIONS, fontVariables } from "@/lib/fonts";
 import { THEME_COLORS, type Appearance, type ThemeColorKey } from "@/lib/settings";
 import "./globals.css";
-import AppNavbar from "@/components/AppNavbar";
+import Navbar from "@/components/Navbar";
 import TickerBar from "@/components/TickerBar";
 import CmsProvider from "@/components/cms/CmsProvider";
 import Footer from "@/components/Footer";
@@ -191,7 +191,7 @@ export default async function RootLayout({
         <CmsProvider texts={texts} images={images}>
           <StartupAnimation />
           <TickerBar ticker={ticker} />
-          <AppNavbar visibility={visibility} />
+          <Navbar visibility={visibility} />
           <main className="flex-1">{children}</main>
           <Footer visibility={visibility} />
           <BackToTop />

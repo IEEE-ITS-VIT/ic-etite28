@@ -1,7 +1,7 @@
 import { CreditCard, FileText } from "lucide-react";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { StatusBadge, btnGold } from "@/components/portal/ui";
-import { payAction } from "@/app/actions/events";
+import { payAction } from "@/app/actions/payments";
 import { formatMoney } from "@/lib/settings";
 
 // Shows what is owed and starts checkout through the configured payment provider.

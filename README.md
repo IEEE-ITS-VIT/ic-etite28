@@ -6,6 +6,14 @@ Live: https://ic-etite28.vercel.app
 
 It contains the public conference website plus a portal with accounts, an admin CMS, the **BOLT** hackathon (and any other event), evaluation, emails, certificates, invoices, **TechNext** stall booking and conference registration. Everything runs on free tiers.
 
+## Three websites, one login
+
+ic-ETITE'28 (this repo, port 3000), **BOLT 3.0** (`IEEEITSVIT/BOLT-3.0`, port 3001) and **TechNext '28** (`IEEEITSVIT/TECHNEXT-3.O`, port 3002) are separate websites with separate admin portals, CMS and payment gateways. They share the D1 database (users, so one account works on all three) and the SMTP account. This repo holds the database migrations and the D1 gateway Worker for all three.
+
+- BOLT and TechNext pages, events, evaluation and stall booking now live on their own websites. The old `/hackathon`, `/technext`, `/events` and `/evaluate` links here redirect to the addresses set in **Admin → Site content → Website links**.
+- Admin roles are per site: `users.role` for ic-ETITE, the `site_roles` table for BOLT and TechNext.
+- `lib/site.ts` names the site; shared code is identical in all three repos.
+
 ## Features
 
 **Public website**: home, call for papers, research tracks, important dates, registration and fees, keynote speakers, committees, advisory board, sponsorship, venue, hotels, visa, contact, previous editions, BOLT and TechNext pages. It includes SEO metadata, a sitemap and robots.txt.

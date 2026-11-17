@@ -71,7 +71,7 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
           </div>
         </Card>
 
-        <Card title="SMTP settings">
+        <Card title="SMTP settings (shared by ic-ETITE'28, BOLT 3.0 and TechNext '28)">
           {envOverride && <p className="mb-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">SMTP_USER / SMTP_PASS are set in the environment and take priority over these fields.</p>}
           <form action={saveSmtpAction} className="grid gap-3 sm:grid-cols-2">
             <Field label="Host">

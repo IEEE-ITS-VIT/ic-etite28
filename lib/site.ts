@@ -3,7 +3,7 @@
 // settings, CMS content, admins, payments and the email queue are kept per site.
 export type SiteKey = "icetite" | "bolt" | "technext";
 
-export const SITE: SiteKey = "icetite";
+export const SITE = "icetite" as SiteKey;
 
 export const SITES: Record<SiteKey, { name: string; short: string; payments: ("conference" | "technext" | "event")[] }> = {
   icetite: { name: "ic-ETITE'28", short: "ic-ETITE", payments: ["conference"] },

@@ -161,14 +161,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
                     back="/dashboard"
                   />
                 )}
-                <Link href="/technext/register" className="text-sm font-semibold text-brand-secondary hover:underline">
+                <Link href="/register" className="text-sm font-semibold text-brand-secondary hover:underline">
                   View or edit booking
                 </Link>
               </div>
             ) : settings.visibility.technextRegistration ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-slate-600">Exhibit your product or project at the industrial expo.</p>
-                <Link href="/technext/register" className={btnGold}>
+                <Link href="/register" className={btnGold}>
                   Book a stall <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

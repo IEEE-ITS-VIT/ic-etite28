@@ -30,44 +30,6 @@ const link = (fd: FormData) => {
   return v || null;
 };
 
-// ─── TechNext ──────────────────────────────────────────────────────────
-
-export async function updateTechnextBookingAction(fd: FormData) {
-  await requireAdmin();
-  const id = str(fd, "id", 40);
-  const back = `/admin/technext?${new URLSearchParams({ status: str(fd, "filter", 20) || "all" })}#b-${id}`;
-  await guarded(back, async () => {
-    const status = str(fd, "status", 20);
-    if (!["pending", "approved", "rejected", "cancelled"].includes(status)) throw new PortalError("Invalid status.");
-    const before = await first<{ status: string; email: string; contact_name: string; organization_name: string; stall_type: string }>(
-      "SELECT status, email, contact_name, organization_name, stall_type FROM technext_bookings WHERE id = ?",
-      [id]
-    );
-    if (!before) throw new PortalError("Booking not found.");
-    const amount = Math.max(0, Math.round(Number(fd.get("payment_amount")) || 0));
-    const notes = str(fd, "admin_notes", 1000);
-    await run("UPDATE technext_bookings SET status = ?, admin_notes = ?, payment_link = ?, payment_amount = ?, updated_at = ? WHERE id = ?", [
-      status,
-      notes || null,
-      link(fd),
-      amount,
-      now(),
-      id,
-    ]);
-    await applyPaymentStatus("technext", id, payment(fd), str(fd, "payment_ref", 120) || null);
-    // Let the exhibitor know when the decision changes.
-    if (before.status !== status && (status === "approved" || status === "rejected")) {
-      const stall = (await getSettings()).technext.stallTypes.find((s) => s.key === before.stall_type);
-      await notify(status === "approved" ? "technext_approved" : "technext_rejected", {
-        to: before.email,
-        name: before.contact_name,
-        scope: "technext",
-        vars: { organisation: before.organization_name, stall: stall?.label ?? before.stall_type, amount: formatInr(amount), notes: notes ? `Note: ${notes}` : "" },
-      });
-    }
-    return "Booking updated.";
-  });
-}
 
 // ─── Conference ────────────────────────────────────────────────────────
 

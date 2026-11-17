@@ -1,5 +1,5 @@
 import "server-only";
-import { SITE, siteKey } from "@/lib/site";
+import { SITE, SITES, siteKey } from "@/lib/site";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { all, isDbConfigured, now, run } from "@/lib/db";
 import { importantDatesData } from "@/data/dates";
@@ -157,6 +157,32 @@ const parseMoney = (v: string) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+// What differs between the three websites before an admin edits anything.
+const SITE_DEFAULTS = {
+  icetite: {
+    invoicePrefix: "ICETITE28",
+    ticker: [
+      { text: "Call for Papers open — full paper submission closes 05 October 2027", url: "/call-for-papers", isNew: true },
+      { text: "ic-ETITE'28 · 10–11 February 2028 · VIT Vellore · Technically co-sponsored by IEEE", url: "/about", isNew: false },
+      { text: "BOLT 3.0 national hackathon and TechNext '28 industrial expo — details coming soon", url: "/", isNew: false },
+    ],
+  },
+  bolt: {
+    invoicePrefix: "BOLT3",
+    ticker: [
+      { text: "BOLT 3.0 — national 24-hour hackathon at Anna Auditorium, VIT Vellore", url: "/#about", isNew: true },
+      { text: "Teams of 2 to 4 · problem statements and registration dates coming soon", url: "/#register", isNew: false },
+    ],
+  },
+  technext: {
+    invoicePrefix: "TECHNEXT28",
+    ticker: [
+      { text: "TechNext '28 industrial expo at VIT Vellore — stall bookings opening soon", url: "/#categories", isNew: true },
+      { text: "Held alongside ic-ETITE'28 and BOLT 3.0", url: "/", isNew: false },
+    ],
+  },
+}[SITE];
+
 export const DEFAULT_SETTINGS: Settings = {
   dates: importantDatesData.map((d) => ({
     id: d.id,
@@ -205,7 +231,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   bolt: { eventSlug: "bolt-3" },
   invoice: {
-    prefix: "ICETITE28",
+    prefix: SITE_DEFAULTS.invoicePrefix,
     orgName: "Vellore Institute of Technology",
     orgAddress: "School of Computer Science Engineering and Information Systems (SCORE), VIT, Vellore, Tamil Nadu 632014, India",
     gstin: "",
@@ -214,8 +240,8 @@ export const DEFAULT_SETTINGS: Settings = {
     phone: "",
     gstPercent: 0,
     title: "Payment Receipt / Invoice",
-    notes: "Thank you for registering for ic-ETITE'28. This is a computer-generated invoice and does not require a signature.",
-    signatory: "Organising Committee, ic-ETITE'28",
+    notes: `Thank you for registering for ${SITES[SITE].name}. This is a computer-generated invoice and does not require a signature.`,
+    signatory: `Organising Committee, ${SITES[SITE].name}`,
   },
   hotels: {
     published: false,
@@ -242,11 +268,7 @@ export const DEFAULT_SETTINGS: Settings = {
     label: "Announcements",
     speed: "normal",
     dismissible: true,
-    items: [
-      { text: "Call for Papers open — full paper submission closes 05 October 2027", url: "/call-for-papers", isNew: true },
-      { text: "ic-ETITE'28 · 10–11 February 2028 · VIT Vellore · Technically co-sponsored by IEEE", url: "/about", isNew: false },
-      { text: "BOLT 3.0 national hackathon and TechNext '28 industrial expo — details coming soon", url: "/hackathon", isNew: false },
-    ],
+    items: SITE_DEFAULTS.ticker,
   },
 };
 

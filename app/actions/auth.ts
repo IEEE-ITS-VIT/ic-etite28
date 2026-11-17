@@ -10,7 +10,7 @@ import { emailLayout, sendNow, textToHtml } from "@/lib/email/mailer";
 import { flash, guarded, isEmail, str } from "@/lib/portal/actions";
 import { PortalError } from "@/lib/portal/events";
 import { SITE_URL } from "@/lib/seo";
-import { SITE, SITE_NAME, SHARED_ACCOUNT_NOTE } from "@/lib/site";
+import { SITE, SITE_NAME } from "@/lib/site";
 import { roleSql, setRoleStatements } from "@/lib/auth/roles";
 import { LIMITS, clearHits, clientIp, isLimited, recordHit, takeToken } from "@/lib/auth/rateLimit";
 
@@ -60,7 +60,7 @@ export async function signupAction(formData: FormData) {
       flash(
         `/login?email=${encodeURIComponent(email)}${next !== "/dashboard" ? `&next=${encodeURIComponent(next)}` : ""}`,
         "error",
-        `An account with ${email} already exists (it may have been created on ic-ETITE'28, BOLT 3.0 or TechNext '28 — ${SHARED_ACCOUNT_NOTE.toLowerCase().replace(/\.$/, "")}). Log in with your existing password, or use “Forgot password?” to reset it.`
+        `An account with ${email} already exists. Accounts are shared by ic-ETITE'28, BOLT 3.0 and TechNext '28, so log in with the password you set on any of them, or use “Forgot password?” to reset it.`
       );
     }
     if (!(await takeToken("signup-ip", await clientIp()))) {

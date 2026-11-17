@@ -6,7 +6,7 @@ import { encrypt } from "@/lib/portal/crypto";
 import { emailLayout, getSmtpSettings, outboxInsert, processOutbox, sendNow, textToHtml, type SmtpChannel } from "@/lib/email/mailer";
 import { bool, guarded, isEmail, num, str } from "@/lib/portal/actions";
 import { PortalError } from "@/lib/portal/events";
-import { SITE, siteKey } from "@/lib/site";
+import { SITE } from "@/lib/site";
 
 const BACK = "/admin/email";
 
@@ -30,7 +30,7 @@ export async function saveSmtpAction(fd: FormData) {
     await run(
       `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-      [siteKey("smtp"), JSON.stringify(value), now(), admin.id]
+      ["smtp", JSON.stringify(value), now(), admin.id]
     );
     return "SMTP settings saved.";
   });
@@ -62,7 +62,7 @@ export async function saveOtpSmtpAction(fd: FormData) {
     await run(
       `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-      [siteKey("smtp_otp"), JSON.stringify(value), now(), admin.id]
+      ["smtp_otp", JSON.stringify(value), now(), admin.id]
     );
     return reset ? "OTP emails now use the main SMTP account." : "OTP & password-reset SMTP saved.";
   });
