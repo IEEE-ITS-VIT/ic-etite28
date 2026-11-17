@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE_NAME } from "@/lib/site";
 import { all, first } from "@/lib/db";
 import { rankLabel } from "@/lib/certificates/render";
 import { SITE_URL } from "@/lib/seo";
@@ -140,7 +141,7 @@ export async function resolveAudience(scope: string, audience: string): Promise<
       userId: r.user_id,
       email: r.email,
       name: r.name,
-      vars: { name: r.name, email: r.email, team: r.affiliation, event: "ic-ETITE'28", portalUrl },
+      vars: { name: r.name, email: r.email, team: r.affiliation, event: SITE_NAME, portalUrl },
     }));
   }
 

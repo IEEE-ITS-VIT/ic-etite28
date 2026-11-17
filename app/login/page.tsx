@@ -1,3 +1,4 @@
+import { SHARED_ACCOUNT_NOTE, SITE_NAME } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AuthShell from "@/components/portal/AuthShell";
@@ -10,10 +11,10 @@ import { isDbConfigured } from "@/lib/db";
 
 export const metadata = portalMetadata("Login");
 
-type SP = Promise<{ next?: string; ok?: string; error?: string }>;
+type SP = Promise<{ next?: string; ok?: string; error?: string; email?: string }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: SP }) {
-  const { next = "", ok, error } = await searchParams;
+  const { next = "", ok, error, email = "" } = await searchParams;
   const user = await getCurrentUser();
   if (user && !error) redirect(next.startsWith("/") ? next : "/dashboard");
   const qs = next ? `?next=${encodeURIComponent(next)}` : "";
@@ -21,7 +22,7 @@ export default async function LoginPage({ searchParams }: { searchParams: SP }) 
   return (
     <AuthShell
       title="Log in"
-      subtitle="Access conference registration, BOLT, TechNext and your certificates."
+      subtitle={`Log in to ${SITE_NAME}. ${SHARED_ACCOUNT_NOTE} Already have an account from one of them? Use the same email and password.`}
       ok={ok}
       error={error}
       footer={
@@ -41,7 +42,7 @@ export default async function LoginPage({ searchParams }: { searchParams: SP }) 
       <form action={loginAction} className="space-y-4">
         <input type="hidden" name="next" value={next} />
         <Field label="Email">
-          <input name="email" type="email" required autoComplete="email" className={inputCls} />
+          <input name="email" type="email" required autoComplete="email" defaultValue={email} className={inputCls} />
         </Field>
         <Field label="Password">
           <input name="password" type="password" required autoComplete="current-password" className={inputCls} />

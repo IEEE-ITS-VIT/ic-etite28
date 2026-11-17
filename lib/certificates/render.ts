@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { SITE_NAME } from "@/lib/site";
 
 // Isomorphic certificate renderer (server routes and the admin's browser both use it).
 // Certificates are generated on demand and never stored.
@@ -127,7 +128,7 @@ export async function addCertificatePage(
 export async function renderCertificatePdf(template: TemplateImage, layout: CertLayout, values: CertValues): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`Certificate - ${values.name ?? ""}`);
-  doc.setCreator("ic-ETITE'28");
+  doc.setCreator(SITE_NAME);
   const image = await embedTemplate(doc, template);
   await addCertificatePage(doc, image, template, layout, values);
   return doc.save();

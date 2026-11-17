@@ -4,6 +4,7 @@ import { all, first, now, parseJson, run } from "@/lib/db";
 import { decrypt } from "@/lib/portal/crypto";
 import { newId } from "@/lib/portal/ids";
 import { SITE_URL } from "@/lib/seo";
+import { SITE, SITE_NAME, siteKey } from "@/lib/site";
 
 // ─── SMTP configuration ────────────────────────────────────────────────
 // Two accounts, both set in /admin/email (passwords stored encrypted in D1):
@@ -13,7 +14,7 @@ import { SITE_URL } from "@/lib/seo";
 // the same login. Each SMTP username has its own daily quota.
 
 export type SmtpChannel = "main" | "otp";
-const SETTING_KEY: Record<SmtpChannel, string> = { main: "smtp", otp: "smtp_otp" };
+const SETTING_KEY: Record<SmtpChannel, string> = { main: siteKey("smtp"), otp: siteKey("smtp_otp") };
 
 export interface SmtpSettings {
   host: string;
@@ -32,7 +33,7 @@ export const DEFAULT_SMTP: SmtpSettings = {
   secure: true,
   user: "",
   passEnc: "",
-  fromName: "ic-ETITE'28",
+  fromName: SITE_NAME,
   fromEmail: "",
   dailyLimit: 450,
 };
@@ -67,7 +68,7 @@ export async function smtpConfig(channel: SmtpChannel = "main"): Promise<SmtpCon
     secure: String(env.SMTP_SECURE ?? s.secure) === "true",
     user,
     pass: env.SMTP_PASS || decrypt(s.passEnc),
-    fromName: s.fromName || "ic-ETITE'28",
+    fromName: s.fromName || SITE_NAME,
     fromEmail: s.fromEmail || user,
     dailyLimit: Number(env.EMAIL_DAILY_LIMIT || s.dailyLimit) || DEFAULT_SMTP.dailyLimit,
     sharesMain: false,
@@ -119,10 +120,10 @@ export function textToHtml(text: string): string {
 export function emailLayout(subject: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="margin:0;background:#F4F6FA;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#1e293b">
   <div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden">
-    <div style="background:#002147;padding:18px 24px;color:#fff;font-weight:800;font-size:18px">ic-ETITE'28 <span style="color:#FFB81C">·</span> <span style="font-weight:600;font-size:14px;color:#cbd5e1">${esc(subject)}</span></div>
+    <div style="background:#002147;padding:18px 24px;color:#fff;font-weight:800;font-size:18px">${esc(SITE_NAME)} <span style="color:#FFB81C">·</span> <span style="font-weight:600;font-size:14px;color:#cbd5e1">${esc(subject)}</span></div>
     <div style="padding:24px;font-size:15px">${bodyHtml}</div>
     <div style="padding:14px 24px;background:#F8FAFC;border-top:1px solid #E2E8F0;font-size:12px;color:#64748b">
-      Third International Conference on Emerging Trends in Information Technology and Engineering · VIT Vellore<br>
+      ${SITE === "icetite" ? "Third International Conference on Emerging Trends in Information Technology and Engineering" : SITE === "bolt" ? "BOLT 3.0 National Hackathon" : "TechNext '28 Industrial Expo"} · VIT Vellore<br>
       <a href="${SITE_URL}/dashboard" style="color:#004B87">Open your dashboard</a>
     </div>
   </div></body></html>`;
@@ -156,8 +157,8 @@ export interface QueuedEmail {
 }
 
 export const outboxInsert = (m: QueuedEmail) => ({
-  sql: `INSERT INTO email_outbox (id, scope, to_email, to_name, subject, html, attachment, priority, status, attempts, created_at, channel)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
+  sql: `INSERT INTO email_outbox (id, scope, to_email, to_name, subject, html, attachment, priority, status, attempts, created_at, channel, site)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)`,
   params: [
     newId(),
     m.scope ?? "global",
@@ -169,6 +170,7 @@ export const outboxInsert = (m: QueuedEmail) => ({
     m.priority ?? 5,
     now(),
     m.channel ?? "main",
+    SITE,
   ],
 });
 
@@ -218,9 +220,10 @@ const OTP_MAX_AGE_MS = 30 * 60e3;
 export async function processOutbox(limit = 20, onlyId?: string): Promise<ProcessResult> {
   const result: ProcessResult = { sent: 0, failed: 0, remainingQueued: 0, dailyRemaining: 0, otpDailyRemaining: 0, smtpConfigured: false };
 
-  await run("UPDATE email_outbox SET status = 'failed', error = ? WHERE channel = 'otp' AND status = 'queued' AND created_at < ?", [
+  await run("UPDATE email_outbox SET status = 'failed', error = ? WHERE channel = 'otp' AND status = 'queued' AND created_at < ? AND site = ?", [
     "Not sent within 30 minutes (daily limit or SMTP error), so the code/link had expired. The user can request a new one.",
     new Date(Date.now() - OTP_MAX_AGE_MS).toISOString(),
+    SITE,
   ]);
 
   for (const channel of ["otp", "main"] as const) {
@@ -234,8 +237,8 @@ export async function processOutbox(limit = 20, onlyId?: string): Promise<Proces
     if (configured && budget > 0) {
       const rows = await all<OutboxRow>(
         `SELECT id, to_email, to_name, subject, html, attachment, attempts FROM email_outbox
-          WHERE status = 'queued' AND channel = ? ${onlyId ? "AND id = ?" : ""} ORDER BY priority, created_at LIMIT ?`,
-        onlyId ? [channel, onlyId, budget] : [channel, budget]
+          WHERE status = 'queued' AND site = ? AND channel = ? ${onlyId ? "AND id = ?" : ""} ORDER BY priority, created_at LIMIT ?`,
+        onlyId ? [SITE, channel, onlyId, budget] : [SITE, channel, budget]
       );
       if (rows.length) {
         const transport = nodemailer.createTransport({
@@ -264,7 +267,7 @@ export async function processOutbox(limit = 20, onlyId?: string): Promise<Proces
     else result.otpDailyRemaining = remaining;
   }
 
-  const q = await first<{ n: number }>("SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued'");
+  const q = await first<{ n: number }>("SELECT COUNT(*) AS n FROM email_outbox WHERE status = 'queued' AND site = ?", [SITE]);
   result.remainingQueued = q?.n ?? 0;
   return result;
 }
@@ -323,8 +326,8 @@ async function sendRow(transport: nodemailer.Transporter, cfg: SmtpConfig, row: 
 // reset links are skipped (they have expired) and nothing is retried more than a few times.
 export async function requeueRecentFailures(): Promise<number> {
   const res = await run(
-    "UPDATE email_outbox SET status = 'queued' WHERE status = 'failed' AND channel = 'main' AND attempts < ? AND created_at > ?",
-    [MAX_ATTEMPTS + 3, new Date(Date.now() - 4 * 864e5).toISOString()]
+    "UPDATE email_outbox SET status = 'queued' WHERE status = 'failed' AND channel = 'main' AND attempts < ? AND created_at > ? AND site = ?",
+    [MAX_ATTEMPTS + 3, new Date(Date.now() - 4 * 864e5).toISOString(), SITE]
   );
   return res.changes;
 }

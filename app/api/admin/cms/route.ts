@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { batch, now, type Statement } from "@/lib/db";
 import type { TextOverride } from "@/lib/cms";
 import { COLLECTIONS, cleanCollection } from "@/lib/collections";
+import { siteKey } from "@/lib/site";
 
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
 
@@ -21,7 +22,8 @@ function cleanText(v: TextOverride | null): TextOverride | null {
 }
 
 // json_set / json_remove per item, so saves from two admins never overwrite each other.
-function upsert(settingKey: string, itemKey: string, value: unknown, userId: string): Statement[] {
+function upsert(name: string, itemKey: string, value: unknown, userId: string): Statement[] {
+  const settingKey = siteKey(name);
   const path = `$."${itemKey.replace(/"/g, "")}"`;
   return [
     { sql: "INSERT OR IGNORE INTO settings (key, value, updated_at, updated_by) VALUES (?, '{}', ?, ?)", params: [settingKey, now(), userId] },

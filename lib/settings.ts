@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE, siteKey } from "@/lib/site";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { all, isDbConfigured, now, run } from "@/lib/db";
 import { importantDatesData } from "@/data/dates";
@@ -251,9 +252,11 @@ async function loadSettings(): Promise<Settings> {
     const rows = await all<{ key: string; value: string }>("SELECT key, value FROM settings");
     const merged: Settings = structuredClone(DEFAULT_SETTINGS);
     for (const row of rows) {
-      if (!(row.key in merged)) continue;
+      // Only this site's rows: "<site>:<key>" on BOLT / TechNext, plain keys on ic-ETITE.
+      const plain = SITE === "icetite" ? (row.key.includes(":") ? null : row.key) : row.key.startsWith(`${SITE}:`) ? row.key.slice(SITE.length + 1) : null;
+      if (!plain || !(plain in merged)) continue;
       const value = JSON.parse(row.value);
-      const k = row.key as SettingsKey;
+      const k = plain as SettingsKey;
       const base = merged[k];
       // Objects merge over defaults so newly added fields keep a value; arrays/scalars replace.
       (merged as unknown as Record<string, unknown>)[k] =
@@ -272,7 +275,7 @@ export async function saveSetting<K extends SettingsKey>(key: K, value: Settings
   await run(
     `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-    [key, JSON.stringify(value), now(), userId]
+    [siteKey(key), JSON.stringify(value), now(), userId]
   );
   revalidateTag("settings");
 }

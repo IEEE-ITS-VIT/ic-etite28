@@ -6,6 +6,7 @@ import { encrypt } from "@/lib/portal/crypto";
 import { emailLayout, getSmtpSettings, outboxInsert, processOutbox, sendNow, textToHtml, type SmtpChannel } from "@/lib/email/mailer";
 import { bool, guarded, isEmail, num, str } from "@/lib/portal/actions";
 import { PortalError } from "@/lib/portal/events";
+import { SITE, siteKey } from "@/lib/site";
 
 const BACK = "/admin/email";
 
@@ -27,9 +28,9 @@ export async function saveSmtpAction(fd: FormData) {
       dailyLimit: Math.max(1, Math.min(10000, num(fd, "dailyLimit", 450))),
     };
     await run(
-      `INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('smtp', ?, ?, ?)
+      `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-      [JSON.stringify(value), now(), admin.id]
+      [siteKey("smtp"), JSON.stringify(value), now(), admin.id]
     );
     return "SMTP settings saved.";
   });
@@ -59,9 +60,9 @@ export async function saveOtpSmtpAction(fd: FormData) {
           dailyLimit: Math.max(0, Math.min(10000, num(fd, "dailyLimit", 0) || 0)),
         };
     await run(
-      `INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('smtp_otp', ?, ?, ?)
+      `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-      [JSON.stringify(value), now(), admin.id]
+      [siteKey("smtp_otp"), JSON.stringify(value), now(), admin.id]
     );
     return reset ? "OTP emails now use the main SMTP account." : "OTP & password-reset SMTP saved.";
   });
@@ -95,7 +96,7 @@ export async function retryFailedAction() {
   await requireAdmin();
   await guarded(BACK, async () => {
     // Expired codes / reset links are not resent: the user requests a new one.
-    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE status = 'failed' AND channel = 'main'");
+    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE status = 'failed' AND channel = 'main' AND site = ?", [SITE]);
     return `${res.changes} failed email(s) re-queued. Click “Send queued emails” to send them now.`;
   });
 }
@@ -105,7 +106,7 @@ export async function resendEmailAction(fd: FormData) {
   await requireAdmin();
   await guarded(BACK, async () => {
     const id = str(fd, "id", 60);
-    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE id = ? AND status = 'failed' AND channel = 'main'", [id]);
+    const res = await run("UPDATE email_outbox SET status = 'queued', attempts = 0, error = NULL WHERE id = ? AND status = 'failed' AND channel = 'main' AND site = ?", [id, SITE]);
     if (res.changes === 0) throw new PortalError("That email is not in the failed list any more.");
     const out = await processOutbox(1, id);
     if (out.sent === 1) return "Email resent.";
@@ -119,11 +120,11 @@ export async function clearOutboxAction(fd: FormData) {
   await guarded(BACK, async () => {
     const which = str(fd, "which", 10);
     if (which === "queued") {
-      const res = await run("DELETE FROM email_outbox WHERE status = 'queued'");
+      const res = await run("DELETE FROM email_outbox WHERE status = 'queued' AND site = ?", [SITE]);
       return `${res.changes} queued email(s) cancelled.`;
     }
     // Keep the last 24h of sent mail so the daily quota stays accurate.
-    const res = await run("DELETE FROM email_outbox WHERE status IN ('sent','failed') AND created_at < ?", [new Date(Date.now() - 864e5).toISOString()]);
+    const res = await run("DELETE FROM email_outbox WHERE status IN ('sent','failed') AND created_at < ? AND site = ?", [new Date(Date.now() - 864e5).toISOString(), SITE]);
     return `${res.changes} old email record(s) deleted.`;
   });
 }

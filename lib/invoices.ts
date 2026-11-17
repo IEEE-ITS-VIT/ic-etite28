@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE, SITES } from "@/lib/site";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
@@ -116,18 +117,21 @@ export async function issueInvoice(purpose: PaymentPurpose, ref: string): Promis
   if (!bill || bill.amount <= 0) return null;
   const { invoice } = await getSettings();
   const prefix = `${(invoice.prefix || "INV").replace(/[^\w-]/g, "")}/${financialYear()}/`;
-  // Next number is computed inside the INSERT so concurrent issues can't share one;
-  // UNIQUE(seq) / UNIQUE(number) reject a collision and we retry.
+  // Numbers run per prefix (each site has its own, e.g. ICETITE28/…, BOLT3/…). They are
+  // computed inside the INSERT so concurrent issues can't share one; UNIQUE(seq) /
+  // UNIQUE(number) reject a collision and we retry.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       await run(
         `INSERT INTO invoices (id, seq, number, purpose, ref_id, user_id, bill_name, bill_email, bill_org, bill_address, bill_gstin,
                                items, amount, currency, payment_ref, issued_at)
-         SELECT ?, COALESCE(MAX(seq), 0) + 1, ? || printf('%05d', COALESCE(MAX(seq), 0) + 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, COALESCE(MAX(seq), 0) + 1,
+                ? || printf('%05d', (SELECT COUNT(*) FROM invoices WHERE substr(number, 1, length(?)) = ?) + 1),
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            FROM invoices
           WHERE NOT EXISTS (SELECT 1 FROM invoices WHERE purpose = ? AND ref_id = ?)`,
         [
-          newId(), prefix, purpose, ref, bill.userId, bill.name, bill.email, bill.org, bill.address, bill.gstin,
+          newId(), prefix, prefix, prefix, purpose, ref, bill.userId, bill.name, bill.email, bill.org, bill.address, bill.gstin,
           JSON.stringify(bill.items), bill.amount, bill.currency, bill.paymentRef, now(), purpose, ref,
         ]
       );
@@ -139,7 +143,12 @@ export async function issueInvoice(purpose: PaymentPurpose, ref: string): Promis
   return null;
 }
 
-export const listInvoices = (limit = 500) => all<InvoiceRow>("SELECT * FROM invoices ORDER BY seq DESC LIMIT ?", [limit]);
+// This site's invoices only (by what was paid for).
+export const listInvoices = (limit = 500) =>
+  all<InvoiceRow>(
+    `SELECT * FROM invoices WHERE purpose IN (${SITES[SITE].payments.map(() => "?").join(",")}) ORDER BY seq DESC LIMIT ?`,
+    [...SITES[SITE].payments, limit]
+  );
 
 // ─── PDF ───────────────────────────────────────────────────────────────
 

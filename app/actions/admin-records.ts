@@ -1,5 +1,9 @@
 "use server";
 
+import { setRoleStatements } from "@/lib/auth/roles";
+import { SITE } from "@/lib/site";
+import type { Role } from "@/lib/auth/session";
+
 import { requireAdmin } from "@/lib/auth/session";
 import { batch, first, now, run } from "@/lib/db";
 import { guarded, isEmail, str } from "@/lib/portal/actions";
@@ -97,7 +101,7 @@ export async function setUserRoleAction(fd: FormData) {
     const role = str(fd, "role", 20);
     if (!["participant", "evaluator", "admin"].includes(role)) throw new PortalError("Invalid role.");
     if (userId === admin.id && role !== "admin") throw new PortalError("You cannot remove your own admin access.");
-    await run("UPDATE users SET role = ?, updated_at = ? WHERE id = ?", [role, now(), userId]);
+    await batch(setRoleStatements(userId, role as Role));
     return "Role updated.";
   });
 }
@@ -122,7 +126,7 @@ export async function inviteUserAction(fd: FormData) {
     if (!isEmail(email)) throw new PortalError("Enter a valid email.");
     const existing = await first<{ id: string; name: string }>("SELECT id, name FROM users WHERE email = ?", [email]);
     if (existing) {
-      await run("UPDATE users SET role = ?, updated_at = ? WHERE id = ?", [role, now(), existing.id]);
+      await batch(setRoleStatements(existing.id, role));
       return `${existing.name} is now ${role === "admin" ? "an admin" : "an evaluator"}.`;
     }
     if (name.length < 2) throw new PortalError("Enter the person's name.");
@@ -132,8 +136,9 @@ export async function inviteUserAction(fd: FormData) {
     await batch([
       {
         sql: `INSERT INTO users (id, email, password_hash, name, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
-        params: [id, email, await hashPassword(randomBytes(24).toString("base64url")), name, role, now(), now()],
+        params: [id, email, await hashPassword(randomBytes(24).toString("base64url")), name, SITE === "icetite" ? role : "participant", now(), now()],
       },
+      ...(SITE === "icetite" ? [] : setRoleStatements(id, role)),
       {
         sql: "INSERT INTO auth_tokens (id, user_id, purpose, expires_at, created_at) VALUES (?, ?, 'reset', ?, ?)",
         params: [sha256(token), id, new Date(Date.now() + 7 * 864e5).toISOString(), now()],

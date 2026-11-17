@@ -10,6 +10,8 @@ import { emailLayout, sendNow, textToHtml } from "@/lib/email/mailer";
 import { flash, guarded, isEmail, str } from "@/lib/portal/actions";
 import { PortalError } from "@/lib/portal/events";
 import { SITE_URL } from "@/lib/seo";
+import { SITE, SITE_NAME, SHARED_ACCOUNT_NOTE } from "@/lib/site";
+import { roleSql, setRoleStatements } from "@/lib/auth/roles";
 import { LIMITS, clearHits, clientIp, isLimited, recordHit, takeToken } from "@/lib/auth/rateLimit";
 
 const safeNext = (v: string) => (v.startsWith("/") && !v.startsWith("//") ? v : "/dashboard");
@@ -34,7 +36,7 @@ async function issueVerificationCode(user: { id: string; email: string; name: st
     subject,
     html: emailLayout(
       "Verify your email",
-      textToHtml(`Hello ${user.name},\n\nYour ic-ETITE'28 verification code is:`) +
+      textToHtml(`Hello ${user.name},\n\nYour ${SITE_NAME} verification code is:`) +
         `<p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#002147;margin:8px 0 18px">${code}</p>` +
         textToHtml(`The code expires in ${CODE_TTL_MIN} minutes. If you did not create an account, you can ignore this email.`)
     ),
@@ -54,7 +56,12 @@ export async function signupAction(formData: FormData) {
     if (password.length < 8) throw new PortalError("Password must be at least 8 characters.");
     if (password !== confirm) throw new PortalError("Passwords do not match.");
     if (await first("SELECT 1 FROM users WHERE email = ?", [email])) {
-      throw new PortalError("An account with this email already exists. Log in instead, or reset your password.");
+      // Accounts are shared by ic-ETITE'28, BOLT 3.0 and TechNext '28.
+      flash(
+        `/login?email=${encodeURIComponent(email)}${next !== "/dashboard" ? `&next=${encodeURIComponent(next)}` : ""}`,
+        "error",
+        `An account with ${email} already exists (it may have been created on ic-ETITE'28, BOLT 3.0 or TechNext '28 — ${SHARED_ACCOUNT_NOTE.toLowerCase().replace(/\.$/, "")}). Log in with your existing password, or use “Forgot password?” to reset it.`
+      );
     }
     if (!(await takeToken("signup-ip", await clientIp()))) {
       throw new PortalError("Too many accounts have been created from this network recently. Please try again in an hour.");
@@ -73,11 +80,12 @@ export async function signupAction(formData: FormData) {
         str(formData, "department", 120) || null,
         str(formData, "year_of_study", 30) || null,
         str(formData, "city", 80) || null,
-        isBootstrapAdmin(email) ? "admin" : "participant",
+        SITE === "icetite" && isBootstrapAdmin(email) ? "admin" : "participant",
         now(),
         now(),
       ]
     );
+    if (SITE !== "icetite" && isBootstrapAdmin(email)) await batch(setRoleStatements(id, "admin"));
     await createSession(id);
     await issueVerificationCode({ id, email, name });
     return `We sent a 6-digit code to ${email}.`;
@@ -108,7 +116,7 @@ export async function verifyEmailAction(formData: FormData) {
       { sql: "UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?", params: [now(), user.id] },
       { sql: "DELETE FROM auth_tokens WHERE user_id = ? AND purpose = 'verify'", params: [user.id] },
     ]);
-    flash(next, "ok", "Email verified. Welcome to the ic-ETITE'28 portal!");
+    flash(next, "ok", `Email verified. Welcome to ${SITE_NAME}!`);
   });
 }
 
@@ -147,14 +155,14 @@ export async function loginAction(formData: FormData) {
     const ip = await clientIp();
     if (await isLimited("login-ip", ip)) flash(back, "error", `Too many failed logins from this network. Try again in ${LIMITS["login-ip"].minutes} minutes.`);
 
-    const user = await first<{ id: string; password_hash: string; role: string }>("SELECT id, password_hash, role FROM users WHERE email = ?", [email]);
+    const user = await first<{ id: string; password_hash: string; role: string }>(`SELECT u.id, u.password_hash, ${roleSql("u")} AS role FROM users u WHERE u.email = ?`, [email]);
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       await run("INSERT INTO login_attempts (email, attempted_at) VALUES (?, ?)", [email, now()]);
       await recordHit("login-ip", ip);
       flash(back, "error", "Incorrect email or password.");
     }
     await run("DELETE FROM login_attempts WHERE email = ? OR attempted_at < ?", [email, since]);
-    if (isBootstrapAdmin(email) && user.role !== "admin") await run("UPDATE users SET role = 'admin' WHERE id = ?", [user.id]);
+    if (isBootstrapAdmin(email) && user.role !== "admin") await batch(setRoleStatements(user.id, "admin"));
     await createSession(user.id);
     redirect(next);
   });
@@ -190,7 +198,7 @@ export async function forgotPasswordAction(formData: FormData) {
       await sendNow({
         to: email,
         toName: user.name,
-        subject: "Reset your ic-ETITE'28 password",
+        subject: `Reset your ${SITE_NAME} password`,
         html: emailLayout(
           "Password reset",
           textToHtml(`Hello ${user.name},\n\nUse the link below to set a new password. It expires in ${RESET_TTL_MIN} minutes.\n\n${link}\n\nIf you did not request this, you can ignore this email.`)

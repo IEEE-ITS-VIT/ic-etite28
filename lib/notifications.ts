@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE_NAME, siteKey } from "@/lib/site";
 import { first, parseJson, run } from "@/lib/db";
 import { emailLayout, fillTemplate, outboxInsert, processOutbox, textToHtml, type TemplateVars } from "@/lib/email/mailer";
 import { SITE_URL } from "@/lib/seo";
@@ -30,7 +31,7 @@ export const NOTIFICATION_DEFS: Record<NotificationKey, { label: string; when: s
     defaults: {
       enabled: true,
       subject: "ic-ETITE'28 registration received — {{category}}",
-      body: "Dear {{name}},\n\nThank you for registering for ic-ETITE'28 as {{category}}.\n\nAmount payable: {{amount}}\nPlease complete the payment from your dashboard{{deadline}}. Your registration is confirmed once the payment is received.\n\n{{portalUrl}}\n\nRegards,\nic-ETITE'28 Organising Committee",
+      body: `Dear {{name}},\n\nThank you for registering for ic-ETITE'28 as {{category}}.\n\nAmount payable: {{amount}}\nPlease complete the payment from your dashboard{{deadline}}. Your registration is confirmed once the payment is received.\n\n{{portalUrl}}\n\nRegards,\n${SITE_NAME} Organising Committee`,
     },
   },
   technext_booked: {
@@ -100,7 +101,7 @@ export const NOTIFICATION_DEFS: Record<NotificationKey, { label: string; when: s
     defaults: {
       enabled: true,
       subject: "Payment received — invoice {{invoiceNumber}}",
-      body: "Dear {{name}},\n\nWe have received your payment of {{amount}} for {{item}}.\n\nInvoice number: {{invoiceNumber}}\nPayment reference: {{paymentRef}}\n\nThe invoice is attached and can also be downloaded from your dashboard:\n{{portalUrl}}\n\nThank you,\nic-ETITE'28 Organising Committee",
+      body: `Dear {{name}},\n\nWe have received your payment of {{amount}} for {{item}}.\n\nInvoice number: {{invoiceNumber}}\nPayment reference: {{paymentRef}}\n\nThe invoice is attached and can also be downloaded from your dashboard:\n{{portalUrl}}\n\nThank you,\n${SITE_NAME} Organising Committee`,
     },
   },
 };
@@ -108,16 +109,16 @@ export const NOTIFICATION_DEFS: Record<NotificationKey, { label: string; when: s
 export const NOTIFICATION_KEYS = Object.keys(NOTIFICATION_DEFS) as NotificationKey[];
 
 export async function getNotificationTemplates(): Promise<Record<NotificationKey, NotificationTemplate>> {
-  const row = await first<{ value: string }>("SELECT value FROM settings WHERE key = 'notifications'").catch(() => null);
+  const row = await first<{ value: string }>("SELECT value FROM settings WHERE key = ?", [siteKey("notifications")]).catch(() => null);
   const saved = parseJson<Partial<Record<NotificationKey, Partial<NotificationTemplate>>>>(row?.value, {});
   return Object.fromEntries(NOTIFICATION_KEYS.map((k) => [k, { ...NOTIFICATION_DEFS[k].defaults, ...(saved[k] ?? {}) }])) as Record<NotificationKey, NotificationTemplate>;
 }
 
 export async function saveNotificationTemplates(value: Record<NotificationKey, NotificationTemplate>, userId: string) {
   await run(
-    `INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('notifications', ?, ?, ?)
+    `INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-    [JSON.stringify(value), new Date().toISOString(), userId]
+    [siteKey("notifications"), JSON.stringify(value), new Date().toISOString(), userId]
   );
 }
 

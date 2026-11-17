@@ -1,3 +1,4 @@
+import { SHARED_ACCOUNT_NOTE } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AuthShell from "@/components/portal/AuthShell";
@@ -20,7 +21,7 @@ export default async function SignupPage({ searchParams }: { searchParams: SP })
   return (
     <AuthShell
       title="Create your account"
-      subtitle="One account for conference registration, BOLT, TechNext and certificates."
+      subtitle={`${SHARED_ACCOUNT_NOTE} If you already registered on any of them, log in with that password instead.`}
       error={error}
       footer={
         <>

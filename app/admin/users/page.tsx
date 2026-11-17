@@ -1,3 +1,4 @@
+import { roleSql } from "@/lib/auth/roles";
 import { all, first } from "@/lib/db";
 import { fmtIst } from "@/lib/portal/actions";
 import { inviteUserAction, setUserRoleAction, verifyUserAction } from "@/app/actions/admin-records";
@@ -11,16 +12,16 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const where: string[] = [];
   const params: unknown[] = [];
   if (q) {
-    where.push("(name LIKE ? OR email LIKE ? OR institution LIKE ?)");
+    where.push("(u.name LIKE ? OR u.email LIKE ? OR u.institution LIKE ?)");
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);
   }
   if (role) {
-    where.push("role = ?");
+    where.push(`${roleSql("u")} = ?`);
     params.push(role);
   }
   const [users, total] = await Promise.all([
     all<{ id: string; name: string; email: string; phone: string | null; institution: string | null; role: string; email_verified: number; created_at: string }>(
-      `SELECT id, name, email, phone, institution, role, email_verified, created_at FROM users ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY created_at DESC LIMIT 300`,
+      `SELECT u.id, u.name, u.email, u.phone, u.institution, ${roleSql("u")} AS role, u.email_verified, u.created_at FROM users u ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY u.created_at DESC LIMIT 300`,
       params
     ),
     first<{ n: number }>("SELECT COUNT(*) AS n FROM users"),

@@ -1,3 +1,4 @@
+import { roleSql } from "@/lib/auth/roles";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
@@ -240,7 +241,7 @@ export default async function AdminEventPage({ params, searchParams }: { params:
 
   async function RoundsTab({ eventId, rounds }: { eventId: string; rounds: Awaited<ReturnType<typeof getRounds>> }) {
     const [evaluators, assigned] = await Promise.all([
-      all<{ id: string; name: string; email: string; role: string }>("SELECT id, name, email, role FROM users WHERE role IN ('evaluator','admin') ORDER BY role, name"),
+      all<{ id: string; name: string; email: string; role: string }>(`SELECT u.id, u.name, u.email, ${roleSql("u")} AS role FROM users u WHERE ${roleSql("u")} IN ('evaluator','admin') ORDER BY role, u.name`),
       all<{ user_id: string }>("SELECT user_id FROM event_evaluators WHERE event_id = ?", [eventId]),
     ]);
     const assignedSet = new Set(assigned.map((a) => a.user_id));

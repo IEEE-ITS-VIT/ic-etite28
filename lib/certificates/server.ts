@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE_NAME } from "@/lib/site";
 import { all, first, parseJson } from "@/lib/db";
 import {
   DEFAULT_LAYOUT,
@@ -139,7 +140,7 @@ export async function certificateRecipients(scope: string, kind: CertKind, userI
     return rows.map((r) => ({
       userId: r.user_id,
       email: r.email,
-      values: { name: r.name, team: r.affiliation, institution: r.affiliation, event: "ic-ETITE'28", date: CONFERENCE_DATE, rank: "" },
+      values: { name: r.name, team: r.affiliation, institution: r.affiliation, event: SITE_NAME, date: CONFERENCE_DATE, rank: "" },
     }));
   }
 

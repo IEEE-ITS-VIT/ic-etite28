@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import { first, now, run } from "@/lib/db";
 import { sha256 } from "@/lib/portal/ids";
+import { SITE } from "@/lib/site";
+import { roleSql } from "@/lib/auth/roles";
 
 export type Role = "participant" | "evaluator" | "admin";
 
@@ -21,9 +23,10 @@ export interface SessionUser {
   email_verified: number;
 }
 
-const SESSION_COOKIE = "ic_session";
+// One cookie per site (on localhost all three share a host, so names must differ).
+const SESSION_COOKIE = SITE === "icetite" ? "ic_session" : `${SITE}_session`;
 // Readable by client JS so the static navbar can show "Dashboard" instead of "Login".
-const LOGGED_IN_COOKIE = "ic_logged_in";
+export const LOGGED_IN_COOKIE = SITE === "icetite" ? "ic_logged_in" : `${SITE}_logged_in`;
 const SESSION_DAYS = 14;
 
 const adminEmails = () =>
@@ -66,7 +69,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   return first<SessionUser>(
-    `SELECT u.id, u.email, u.name, u.role, u.phone, u.institution, u.department, u.year_of_study, u.city, u.email_verified
+    `SELECT u.id, u.email, u.name, ${roleSql("u")} AS role, u.phone, u.institution, u.department, u.year_of_study, u.city, u.email_verified
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > ?`,
     [sha256(token), now()]

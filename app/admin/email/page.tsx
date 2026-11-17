@@ -1,3 +1,4 @@
+import { SITE } from "@/lib/site";
 import { all, first } from "@/lib/db";
 import { getSmtpSettings, sentInLast24h, smtpConfig } from "@/lib/email/mailer";
 import { clearOutboxAction, resendEmailAction, retryFailedAction, saveOtpSmtpAction, saveSmtpAction, sendTestEmailAction } from "@/app/actions/admin-email";
@@ -16,15 +17,15 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
     smtpConfig("main"),
     smtpConfig("otp"),
     first<{ queued: number; failed: number; sent: number }>(
-      "SELECT SUM(status = 'queued') AS queued, SUM(status = 'failed') AS failed, SUM(status = 'sent') AS sent FROM email_outbox"
+      "SELECT SUM(status = 'queued') AS queued, SUM(status = 'failed') AS failed, SUM(status = 'sent') AS sent FROM email_outbox WHERE site = ?", [SITE]
     ),
     all<{ id: string; to_email: string; subject: string; status: string; error: string | null; created_at: string; sent_at: string | null; attachment: string | null; channel: string }>(
-      "SELECT id, to_email, subject, status, error, created_at, sent_at, attachment, channel FROM email_outbox ORDER BY created_at DESC LIMIT 60"
+      "SELECT id, to_email, subject, status, error, created_at, sent_at, attachment, channel FROM email_outbox WHERE site = ? ORDER BY created_at DESC LIMIT 60", [SITE]
     ),
     getNotificationTemplates(),
   ]);
   const failedRows = await all<{ id: string; to_email: string; subject: string; error: string | null; created_at: string }>(
-    "SELECT id, to_email, subject, error, created_at FROM email_outbox WHERE status = 'failed' AND channel = 'main' ORDER BY created_at DESC LIMIT 200"
+    "SELECT id, to_email, subject, error, created_at FROM email_outbox WHERE status = 'failed' AND channel = 'main' AND site = ? ORDER BY created_at DESC LIMIT 200", [SITE]
   );
   const [sent24, otpSent24] = await Promise.all([sentInLast24h(mainCfg.user || undefined), sentInLast24h(otpCfg.user || undefined)]);
   const otpEnv = Boolean(process.env.SMTP_OTP_USER && process.env.SMTP_OTP_PASS);
