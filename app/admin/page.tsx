@@ -59,6 +59,61 @@ export default async function AdminHome() {
         {tile("/admin/users", SITE === "bolt" ? "Users & evaluators" : "Users & roles", `Roles on ${SITE_NAME} only. Accounts are shared by all three websites.`)}
         {tile("/admin/email", "Email & SMTP", `${c?.queued ?? 0} email(s) queued.`)}
       </div>
+      <Card title="Export Registrations & Accounts (Excel .xlsx)" className="mt-6">
+        <p className="mb-4 text-sm text-slate-600">
+          Download real-time spreadsheets containing full participant details (name, email, phone, institution, department, year of study, city, payment info, UTR, and timestamps).
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {SITE === "bolt" && (
+            <a
+              href="/api/admin/export?scope=all-events&format=xlsx"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export BOLT Registrations (.xlsx)
+            </a>
+          )}
+          {SITE === "icetite" && (
+            <a
+              href="/api/admin/export?scope=conference&format=xlsx"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Conference Registrations (.xlsx)
+            </a>
+          )}
+          {SITE === "technext" && (
+            <a
+              href="/api/admin/export?scope=technext&format=xlsx"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export TechNext Stalls (.xlsx)
+            </a>
+          )}
+          <a
+            href="/api/admin/export?scope=all&format=xlsx"
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export Master Workbook (All 3 Sites)
+          </a>
+          <a
+            href="/api/admin/export?scope=users&format=xlsx"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            Export All Users (.xlsx)
+          </a>
+        </div>
+      </Card>
       <Card title="Status" className="mt-6">
         <div className="flex flex-wrap gap-3 text-sm">
           {SITE === "icetite" && (

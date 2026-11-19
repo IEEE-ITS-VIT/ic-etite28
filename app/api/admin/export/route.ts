@@ -3,17 +3,114 @@ import JSZip from "jszip";
 import { all, first, parseJson } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { toCsv } from "@/lib/portal/csv";
+import {
+  buildExcelWorkbook,
+  getConferenceRegistrationsSheet,
+  getTechnextBookingsSheet,
+  getEventSheets,
+  getAllEventsSheet,
+  getUsersSheet,
+} from "@/lib/portal/excel";
 import { getRounds, roundCriteria, roundFields, roundLeaderboard, type EventRow } from "@/lib/portal/events";
 import { certificateRecipients } from "@/lib/certificates/server";
 import { rankLabel, safeFilename } from "@/lib/certificates/render";
 
 export const maxDuration = 60;
 
-// Downloads everything for a scope as a ZIP of CSV files (before purging data).
+// Downloads registration data as either an Excel workbook (.xlsx) or a ZIP of CSV files.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  
   const scope = req.nextUrl.searchParams.get("scope") ?? "";
+  const format = req.nextUrl.searchParams.get("format") ?? (scope === "all" || scope === "users" || scope === "events" ? "xlsx" : "xlsx");
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  // ──────────────────────── Excel (.xlsx) Export ────────────────────────
+  if (format === "xlsx") {
+    if (scope.startsWith("event:")) {
+      const event = await first<EventRow>("SELECT * FROM events WHERE id = ?", [scope.slice(6)]);
+      if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+      const sheets = await getEventSheets(event);
+      const bytes = buildExcelWorkbook(sheets);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`${event.slug}-registrations-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (scope === "events" || scope === "all-events") {
+      const sheet = await getAllEventsSheet();
+      const bytes = buildExcelWorkbook([sheet]);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`all-events-registrations-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (scope === "technext") {
+      const sheet = await getTechnextBookingsSheet();
+      const bytes = buildExcelWorkbook([sheet]);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`technext-bookings-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (scope === "conference") {
+      const sheet = await getConferenceRegistrationsSheet();
+      const bytes = buildExcelWorkbook([sheet]);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`conference-registrations-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (scope === "users") {
+      const sheet = await getUsersSheet();
+      const bytes = buildExcelWorkbook([sheet]);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`users-directory-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (scope === "all" || scope === "master") {
+      const [conf, events, technext, users] = await Promise.all([
+        getConferenceRegistrationsSheet(),
+        getAllEventsSheet(),
+        getTechnextBookingsSheet(),
+        getUsersSheet(),
+      ]);
+      const bytes = buildExcelWorkbook([conf, events, technext, users]);
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${safeFilename(`all-registrations-master-${stamp}`)}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+
+  // ──────────────────────── CSV / ZIP Export ────────────────────────
   const zip = new JSZip();
   let name = "export";
 
@@ -28,13 +125,20 @@ export async function GET(req: NextRequest) {
   } else if (scope === "conference") {
     name = "conference";
     await exportConference(zip);
+  } else if (scope === "users") {
+    name = "users";
+    await exportUsers(zip);
+  } else if (scope === "all" || scope === "master") {
+    name = "all-data";
+    await exportConference(zip);
+    await exportTechnext(zip);
+    await exportUsers(zip);
   } else {
     return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
   }
 
   const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-  const stamp = new Date().toISOString().slice(0, 10);
-  return new NextResponse(Buffer.from(bytes), {
+  return new NextResponse(bytes as unknown as BodyInit, {
     headers: {
       "content-type": "application/zip",
       "content-disposition": `attachment; filename="${safeFilename(`${name}-export-${stamp}`)}.zip"`,
@@ -143,4 +247,10 @@ async function exportConference(zip: JSZip) {
   );
   const cols = Object.keys(rows[0] ?? { name: 1, email: 1 });
   zip.file("conference-registrations.csv", toCsv(cols, rows.map((r) => cols.map((c) => r[c]))));
+}
+
+async function exportUsers(zip: JSZip) {
+  const rows = await all<Record<string, unknown>>("SELECT id, name, email, phone, institution, department, year_of_study, city, role, email_verified, created_at FROM users ORDER BY created_at");
+  const cols = ["id", "name", "email", "phone", "institution", "department", "year_of_study", "city", "role", "email_verified", "created_at"];
+  zip.file("users.csv", toCsv(cols, rows.map((r) => cols.map((c) => r[c]))));
 }
