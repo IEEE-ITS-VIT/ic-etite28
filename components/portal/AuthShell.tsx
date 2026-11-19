@@ -27,7 +27,7 @@ export default function AuthShell({
         </div>
         <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-2xl">
           <h1 className="text-2xl font-extrabold text-brand-primary">{title}</h1>
-          {subtitle && <p className="mt-1.5 text-[15px] text-slate-600">{subtitle}</p>}
+          {subtitle && <div className="mt-1.5 text-[15px] text-slate-600">{subtitle}</div>}
           <div className="mt-6">
             <Flash ok={ok} error={error} />
             {children}

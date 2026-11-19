@@ -1,7 +1,8 @@
-import { SHARED_ACCOUNT_NOTE } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AuthShell from "@/components/portal/AuthShell";
+import SharedAccountBanner from "@/components/portal/SharedAccountBanner";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Field, inputCls } from "@/components/portal/ui";
 import { signupAction } from "@/app/actions/auth";
@@ -21,7 +22,14 @@ export default async function SignupPage({ searchParams }: { searchParams: SP })
   return (
     <AuthShell
       title="Create your account"
-      subtitle={`${SHARED_ACCOUNT_NOTE} If you already registered on any of them, log in with that password instead.`}
+      subtitle={
+        <>
+          <p className="text-[14.5px] text-slate-600">
+            Create an account to participate in <strong className="font-semibold text-slate-900">{SITE_NAME}</strong>.
+          </p>
+          <SharedAccountBanner mode="signup" currentSiteName={SITE_NAME} />
+        </>
+      }
       error={error}
       footer={
         <>

@@ -1,7 +1,8 @@
-import { SHARED_ACCOUNT_NOTE, SITE_NAME } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AuthShell from "@/components/portal/AuthShell";
+import SharedAccountBanner from "@/components/portal/SharedAccountBanner";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Field, inputCls } from "@/components/portal/ui";
 import { loginAction } from "@/app/actions/auth";
@@ -22,7 +23,14 @@ export default async function LoginPage({ searchParams }: { searchParams: SP }) 
   return (
     <AuthShell
       title="Log in"
-      subtitle={`Log in to ${SITE_NAME}. ${SHARED_ACCOUNT_NOTE} Already have an account from one of them? Use the same email and password.`}
+      subtitle={
+        <>
+          <p className="text-[14.5px] text-slate-600">
+            Log in to <strong className="font-semibold text-slate-900">{SITE_NAME}</strong> with your email and password.
+          </p>
+          <SharedAccountBanner mode="login" currentSiteName={SITE_NAME} />
+        </>
+      }
       ok={ok}
       error={error}
       footer={
