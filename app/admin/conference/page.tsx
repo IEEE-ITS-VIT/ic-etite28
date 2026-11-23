@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { all } from "@/lib/db";
 import { formatMoney } from "@/lib/settings";
 import { fmtIst } from "@/lib/portal/actions";
@@ -54,6 +55,12 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
         title="Registrations"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/visa"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Visa letters →
+            </Link>
             <a
               href="/api/admin/export?scope=conference&format=xlsx"
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"

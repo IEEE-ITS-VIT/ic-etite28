@@ -20,6 +20,7 @@ const NAV_BY_SITE: Record<SiteKey, { href: string; label: string }[]> = {
     { href: "/admin/content", label: "Page content" },
     { href: "/admin/lists", label: "Lists" },
     { href: "/admin/conference", label: "Conference registrations" },
+    { href: "/admin/visa", label: "Visa letters" },
     { href: "/admin/hotels", label: "Hotels" },
     ...COMMON_END,
   ],

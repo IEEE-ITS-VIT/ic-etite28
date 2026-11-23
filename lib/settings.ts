@@ -9,8 +9,9 @@ import { hotelsData, type Hotel } from "@/data/hotels";
 import { defaultSponsorPackages, type SponsorPackage } from "@/data/sponsorship";
 import type { FontKey } from "@/lib/fonts";
 import type { ImageOverrides, TextOverrides } from "@/lib/cms";
+import type { VisaTemplate } from "@/lib/visa/types";
 
-export type { EarlyBird, Prize };
+export type { EarlyBird, Prize, VisaTemplate };
 
 // ─── CMS-managed content ───────────────────────────────────────────────
 // Only these parts of the public site are editable from /admin/settings; everything
@@ -135,6 +136,7 @@ export interface Settings {
   payments: PaymentSettings;
   bolt: { eventSlug: string };
   invoice: InvoiceTemplate;
+  visa: VisaTemplate;
   hotels: HotelsSettings;
   sponsorship: { packages: SponsorPackage[] };
   ticker: TickerSettings;
@@ -242,6 +244,28 @@ export const DEFAULT_SETTINGS: Settings = {
     title: "Payment Receipt / Invoice",
     notes: `Thank you for registering for ${SITES[SITE].name}. This is a computer-generated invoice and does not require a signature.`,
     signatory: `Organising Committee, ${SITES[SITE].name}`,
+  },
+  visa: {
+    refPrefix: "VIT/ic-ETITE28/VISA",
+    title: "OFFICIAL INVITATION LETTER FOR INDIAN CONFERENCE VISA",
+    conferenceTitle: "3rd International Conference on Emerging Trends in Information Technology and Engineering (ic-ETITE'28)",
+    conferenceShortName: "ic-ETITE'28",
+    organizer: "School of Information Technology and Engineering (SITE), Vellore Institute of Technology (VIT)",
+    venue: "Vellore Institute of Technology (VIT), Vellore, Tamil Nadu - 632014, India",
+    dates: "10-11 February 2028",
+    addressee: "To Whom It May Concern / The Consular Officer\nEmbassy / High Commission / Consulate General of India",
+    openingText: "On behalf of the Organising Committee, we are pleased to confirm that the following applicant has registered to attend the 3rd International Conference on Emerging Trends in Information Technology and Engineering (ic-ETITE'28), organised by the School of Information Technology and Engineering (SITE) at Vellore Institute of Technology (VIT), Vellore, Tamil Nadu, India from 10 to 11 February 2028.",
+    paperText: "The participant has submitted research work titled \"{{paperTitle}}\" (Paper ID: {{paperId}}), which has been peer-reviewed and accepted for presentation in the technical sessions of the conference.",
+    purposeText: "The purpose of this visit is strictly academic and for attending the conference. Vellore Institute of Technology confirms that no remuneration, honorarium, or employment will be provided to the delegate in India. The participant will return to their country of residence immediately upon the conclusion of the event.",
+    clearancesText: "ic-ETITE'28 is conducted with all mandatory statutory approvals from the Government of India, including Political Clearance from the Ministry of External Affairs (MEA), Event Clearance from the Ministry of Home Affairs (MHA), and Nodal Clearance from the Ministry of Education (MoE). The applicant is eligible to apply for an Indian Conference Visa / e-Conference Visa.",
+    closingText: "We respectfully request the competent Consular Authorities to grant the necessary Conference Visa to enable the applicant to attend this premier academic conference.",
+    signatoryName: "Prof. / Dr. Organising Chair",
+    signatoryTitle: "General Chair, ic-ETITE'28",
+    signatoryDept: "School of Information Technology and Engineering (SITE)",
+    signatoryOrg: "Vellore Institute of Technology (VIT), Vellore - 632014, Tamil Nadu, India",
+    signatoryEmail: "icetiteconference@vit.ac.in",
+    signatoryPhone: "+91 416 220 2028",
+    notes: "This official invitation letter is computer-generated and issued to confirmed registrants for the sole purpose of Indian Conference Visa application.",
   },
   hotels: {
     published: false,

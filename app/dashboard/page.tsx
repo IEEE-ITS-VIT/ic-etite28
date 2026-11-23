@@ -1,11 +1,12 @@
 import { SITE, SITES, SITE_NAME } from "@/lib/site";
 import Link from "next/link";
-import { ArrowRight, Award, ClipboardCheck, Settings2, Store, Ticket, Trophy } from "lucide-react";
+import { ArrowRight, Award, ClipboardCheck, Download, FileText, Settings2, Store, Ticket, Trophy } from "lucide-react";
 import { all, first } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { formatMoney, getSettings } from "@/lib/settings";
 import { registrationWindow, type EventRow } from "@/lib/portal/events";
 import { logoutAction } from "@/app/actions/auth";
+import { getVisaRequestForUser } from "@/lib/visa/server";
 import PaymentCard from "@/components/portal/PaymentCard";
 import { Badge, Card, Empty, Flash, PortalPage, StatusBadge, btnGold, btnPrimary, btnSecondary } from "@/components/portal/ui";
 import { portalMetadata } from "@/lib/seo";
@@ -60,6 +61,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
       (SITE === "technext" && c.scope === "technext" && booking?.status === "approved")
   );
   const openToJoin = openEvents.filter((e) => registrationWindow(e) === "open");
+  const visaRequest = SITE === "icetite" && conference ? await getVisaRequestForUser(user.id) : null;
 
   return (
     <PortalPage
@@ -120,6 +122,65 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
             <Empty>Conference registration will open soon.</Empty>
           )}
         </Card>
+        )}
+
+        {/* Visa Invitation Letter */}
+        {SITE === "icetite" && conference && (
+          <Card
+            title={
+              <span className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-brand-primary" /> Visa Invitation Letter
+              </span>
+            }
+          >
+            <div className="space-y-3">
+              {visaRequest ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-800">Passport {visaRequest.passport_number}</span>
+                    <StatusBadge status={visaRequest.status} />
+                  </div>
+                  {visaRequest.status === "approved" && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <a href="/api/visa-letter" className={btnPrimary} download>
+                        <Download className="h-4 w-4" /> Download Visa Letter (PDF)
+                      </a>
+                      <Link href="/dashboard/visa" className={btnSecondary}>
+                        View Details
+                      </Link>
+                    </div>
+                  )}
+                  {visaRequest.status === "pending" && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-600">Your visa letter request is under admin review.</p>
+                      <Link href="/dashboard/visa" className="text-sm font-semibold text-brand-secondary hover:underline block">
+                        View or update request particulars →
+                      </Link>
+                    </div>
+                  )}
+                  {visaRequest.status === "rejected" && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-rose-600">
+                        {visaRequest.admin_notes ? `Revision needed: ${visaRequest.admin_notes}` : "Your visa letter request was declined."}
+                      </p>
+                      <Link href="/dashboard/visa" className={btnSecondary}>
+                        Update &amp; Resubmit Request
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-600">
+                    Traveling from abroad or need an official Indian Conference Visa facilitation letter?
+                  </p>
+                  <Link href="/dashboard/visa" className={btnSecondary}>
+                    Request Visa Invitation Letter →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </Card>
         )}
 
         {/* The other two websites share this account */}

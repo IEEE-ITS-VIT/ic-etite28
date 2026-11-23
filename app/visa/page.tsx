@@ -13,6 +13,7 @@ import {
   Clock,
   Download,
   Building2,
+  ArrowRight,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import E from "@/components/cms/E";
@@ -225,6 +226,14 @@ export default function VisaPage() {
               <p className="text-xs text-white/75 leading-relaxed"><E f="visa">{"Send your details to the official conference secretariat email with the subject line:"}</E><br />
                 <code className="text-[#72EFDD] bg-black/40 px-2 py-0.5 rounded text-[11px] mt-1 inline-block"><E f="visa">{"[Visa Letter Request] Paper ID - Full Name"}</E></code>
               </p>
+
+              <Link
+                href="/dashboard/visa"
+                className="bg-brand-accent text-brand-primary hover:bg-brand-accent-dark w-full text-xs sm:text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg transition"
+              >
+                <span><E f="visa">{"Request Visa Letter via Dashboard"}</E></span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
 
               <a
                 href="mailto:icetiteconference@vit.ac.in?subject=%5BVisa%20Letter%20Request%5D%20Paper%20ID%20-%20Full%20Name&body=Dear%20ic-ETITE%2728%20Secretariat%2C%0A%0APlease%20find%20my%20details%20for%20an%20official%20visa%20invitation%20letter%3A%0A%0A1.%20Full%20Name%20(as%20in%20Passport)%3A%20%0A2.%20Passport%20Number%3A%20%0A3.%20Passport%20Expiry%20Date%3A%20%0A4.%20Nationality%3A%20%0A5.%20Institution%2FUniversity%3A%20%0A6.%20Designation%3A%20%0A7.%20Accepted%20Paper%20ID%20%26%20Title%3A%20%0A8.%20Registration%20Order%20ID%3A%20%0A%0AThank%20you%2C%0A"
