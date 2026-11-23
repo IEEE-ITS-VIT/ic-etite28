@@ -5,7 +5,8 @@ import { getSettings } from "@/lib/settings";
 import { portalMetadata } from "@/lib/seo";
 import { fmtIst } from "@/lib/portal/actions";
 import { saveVisaTemplateAction, updateVisaRequestStatusAction } from "@/app/actions/visa";
-import { getVisaStats, listVisaRequests } from "@/lib/visa/server";
+import { getVisaStats, getVisaTemplateRow, listVisaRequests } from "@/lib/visa/server";
+import VisaTemplateEditor from "@/components/admin/VisaTemplateEditor";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Card, Empty, Field, Flash, PortalPage, Stat, StatusBadge, Table, Td, btnSecondary, inputCls } from "@/components/portal/ui";
 
@@ -25,10 +26,11 @@ export default async function AdminVisaPage({ searchParams }: { searchParams: Se
   const { ok, error, q, status, tab } = await searchParams;
   await requireAdmin("/admin/visa");
 
-  const [stats, requests, settings] = await Promise.all([
+  const [stats, requests, settings, existingTemplate] = await Promise.all([
     getVisaStats(),
     listVisaRequests({ status: status || "all", q }),
     getSettings(),
+    getVisaTemplateRow(),
   ]);
 
   const activeTab = tab === "template" ? "template" : "requests";
@@ -269,236 +271,10 @@ export default async function AdminVisaPage({ searchParams }: { searchParams: Se
         </Card>
       ) : (
         /* Template Configuration Tab */
-        <Card
-          title="Official Visa Letterhead &amp; Body Template"
-          actions={
-            <a
-              href="/api/visa-letter?preview=1&inline=1"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={btnSecondary}
-            >
-              <Eye className="h-4 w-4" /> Live PDF Preview
-            </a>
-          }
-        >
-          <form action={saveVisaTemplateAction} className="space-y-6">
-            <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-xs text-sky-900 leading-relaxed">
-              <strong>Available Placeholders:</strong> You can use standard dynamic tokens in any paragraph:
-              <div className="mt-1.5 flex flex-wrap gap-1 font-mono text-[11px] text-sky-800">
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{name}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{passportNumber}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{passportExpiry}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{nationality}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{dob}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{gender}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{affiliation}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{designation}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{country}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{paperId}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{paperTitle}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{registrationRef}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{dates}}"}</span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{venue}}"}</span>
-              </div>
-            </div>
-
-            {/* Document Header & Reference */}
-            <div>
-              <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                1. Reference Number &amp; Addressee
-              </h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Field label="Reference Number Prefix" hint="e.g. VIT/ic-ETITE28/VISA">
-                  <input
-                    name="refPrefix"
-                    defaultValue={tpl.refPrefix}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Document Subject Line">
-                  <input
-                    name="title"
-                    defaultValue={tpl.title}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Default Consular Addressee" className="sm:col-span-2">
-                  <textarea
-                    name="addressee"
-                    defaultValue={tpl.addressee}
-                    rows={2}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            {/* Conference Particulars */}
-            <div>
-              <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                2. Conference Particulars
-              </h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Field label="Full Conference Title" className="sm:col-span-2">
-                  <input
-                    name="conferenceTitle"
-                    defaultValue={tpl.conferenceTitle}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Short Name / Acronym">
-                  <input
-                    name="conferenceShortName"
-                    defaultValue={tpl.conferenceShortName}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Conference Dates">
-                  <input
-                    name="dates"
-                    defaultValue={tpl.dates}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Venue &amp; Host Institution" className="sm:col-span-2">
-                  <input
-                    name="venue"
-                    defaultValue={tpl.venue}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            {/* Letter Text & Clearances */}
-            <div>
-              <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                3. Letter Content Paragraphs
-              </h4>
-              <div className="mt-3 space-y-3">
-                <Field label="Opening Invitation Paragraph">
-                  <textarea
-                    name="openingText"
-                    defaultValue={tpl.openingText}
-                    rows={3}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Paper Presentation Paragraph (for Authors)">
-                  <textarea
-                    name="paperText"
-                    defaultValue={tpl.paperText}
-                    rows={2}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Purpose of Stay &amp; Non-Employment Declaration">
-                  <textarea
-                    name="purposeText"
-                    defaultValue={tpl.purposeText}
-                    rows={3}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Government Clearances (MEA / MHA / MoE)">
-                  <textarea
-                    name="clearancesText"
-                    defaultValue={tpl.clearancesText}
-                    rows={3}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Closing Request to Consular Officer">
-                  <textarea
-                    name="closingText"
-                    defaultValue={tpl.closingText}
-                    rows={2}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            {/* Signatory & Endorsement */}
-            <div>
-              <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                4. Signatory &amp; Contact Details
-              </h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Field label="Signatory Name">
-                  <input
-                    name="signatoryName"
-                    defaultValue={tpl.signatoryName}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Signatory Title">
-                  <input
-                    name="signatoryTitle"
-                    defaultValue={tpl.signatoryTitle}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Department / Division">
-                  <input
-                    name="signatoryDept"
-                    defaultValue={tpl.signatoryDept}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Institution Name &amp; Address">
-                  <input
-                    name="signatoryOrg"
-                    defaultValue={tpl.signatoryOrg}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Signatory Official Email">
-                  <input
-                    name="signatoryEmail"
-                    type="email"
-                    defaultValue={tpl.signatoryEmail}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Signatory Phone Number">
-                  <input
-                    name="signatoryPhone"
-                    defaultValue={tpl.signatoryPhone}
-                    required
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Footer Disclaimer Notes" className="sm:col-span-2">
-                  <input
-                    name="notes"
-                    defaultValue={tpl.notes}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 pt-3">
-              <SubmitButton pendingText="Saving…">Save Visa Letter Template</SubmitButton>
+        <div className="space-y-6">
+          <Card
+            title="Visual Template Designer (Drag & Drop)"
+            actions={
               <a
                 href="/api/visa-letter?preview=1&inline=1"
                 target="_blank"
@@ -507,9 +283,239 @@ export default async function AdminVisaPage({ searchParams }: { searchParams: Se
               >
                 <Eye className="h-4 w-4" /> Live PDF Preview
               </a>
-            </div>
-          </form>
-        </Card>
+            }
+          >
+            <VisaTemplateEditor existing={existingTemplate} />
+          </Card>
+
+          {/* Optional Default Text Presets */}
+          <details className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition">
+            <summary className="cursor-pointer text-sm font-bold text-slate-800 list-none flex items-center justify-between">
+              <span>Default Text Presets &amp; Organization Particulars</span>
+              <span className="text-xs text-brand-secondary font-semibold group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+
+            <form action={saveVisaTemplateAction} className="mt-5 space-y-6 border-t border-slate-100 pt-5">
+              <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-xs text-sky-900 leading-relaxed">
+                <strong>Available Placeholders:</strong> Standard dynamic tokens you can use in any paragraph:
+                <div className="mt-1.5 flex flex-wrap gap-1 font-mono text-[11px] text-sky-800">
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{name}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{passportNumber}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{passportExpiry}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{nationality}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{dob}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{gender}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{affiliation}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{designation}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{country}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{paperId}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{paperTitle}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{registrationRef}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{dates}}"}</span>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5">{"{{venue}}"}</span>
+                </div>
+              </div>
+
+              {/* Document Header & Reference */}
+              <div>
+                <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  1. Reference Number &amp; Addressee
+                </h4>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Reference Number Prefix" hint="e.g. VIT/ic-ETITE28/VISA">
+                    <input
+                      name="refPrefix"
+                      defaultValue={tpl.refPrefix}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Document Subject Line">
+                    <input
+                      name="title"
+                      defaultValue={tpl.title}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Default Consular Addressee" className="sm:col-span-2">
+                    <textarea
+                      name="addressee"
+                      defaultValue={tpl.addressee}
+                      rows={2}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Conference Particulars */}
+              <div>
+                <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  2. Conference Particulars
+                </h4>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Full Conference Title" className="sm:col-span-2">
+                    <input
+                      name="conferenceTitle"
+                      defaultValue={tpl.conferenceTitle}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Short Name / Acronym">
+                    <input
+                      name="conferenceShortName"
+                      defaultValue={tpl.conferenceShortName}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Conference Dates">
+                    <input
+                      name="dates"
+                      defaultValue={tpl.dates}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Venue &amp; Host Institution" className="sm:col-span-2">
+                    <input
+                      name="venue"
+                      defaultValue={tpl.venue}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Letter Text & Clearances */}
+              <div>
+                <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  3. Letter Content Paragraphs
+                </h4>
+                <div className="mt-3 space-y-3">
+                  <Field label="Opening Invitation Paragraph">
+                    <textarea
+                      name="openingText"
+                      defaultValue={tpl.openingText}
+                      rows={3}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Paper Presentation Paragraph (for Authors)">
+                    <textarea
+                      name="paperText"
+                      defaultValue={tpl.paperText}
+                      rows={2}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Purpose of Stay &amp; Non-Employment Declaration">
+                    <textarea
+                      name="purposeText"
+                      defaultValue={tpl.purposeText}
+                      rows={3}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Government Clearances (MEA / MHA / MoE)">
+                    <textarea
+                      name="clearancesText"
+                      defaultValue={tpl.clearancesText}
+                      rows={3}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Closing Request to Consular Officer">
+                    <textarea
+                      name="closingText"
+                      defaultValue={tpl.closingText}
+                      rows={2}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Signatory & Endorsement */}
+              <div>
+                <h4 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  4. Signatory &amp; Contact Details
+                </h4>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Signatory Name">
+                    <input
+                      name="signatoryName"
+                      defaultValue={tpl.signatoryName}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Signatory Title">
+                    <input
+                      name="signatoryTitle"
+                      defaultValue={tpl.signatoryTitle}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Department / Division">
+                    <input
+                      name="signatoryDept"
+                      defaultValue={tpl.signatoryDept}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Institution Name &amp; Address">
+                    <input
+                      name="signatoryOrg"
+                      defaultValue={tpl.signatoryOrg}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Signatory Official Email">
+                    <input
+                      name="signatoryEmail"
+                      type="email"
+                      defaultValue={tpl.signatoryEmail}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Signatory Phone Number">
+                    <input
+                      name="signatoryPhone"
+                      defaultValue={tpl.signatoryPhone}
+                      required
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Footer Disclaimer Notes" className="sm:col-span-2">
+                    <input
+                      name="notes"
+                      defaultValue={tpl.notes}
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-3">
+                <SubmitButton pendingText="Saving…">Save Presets</SubmitButton>
+              </div>
+            </form>
+          </details>
+        </div>
       )}
     </PortalPage>
   );

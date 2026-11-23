@@ -9,7 +9,8 @@ import { PortalError } from "@/lib/portal/events";
 import { newId } from "@/lib/portal/ids";
 import { emailLayout, outboxInsert, textToHtml } from "@/lib/email/mailer";
 import { ensureVisaTable, getVisaRequestById } from "@/lib/visa/server";
-import type { VisaStatus, VisaTemplate } from "@/lib/visa/types";
+import type { VisaLayout, VisaStatus, VisaTemplate } from "@/lib/visa/types";
+import { DEFAULT_VISA_LAYOUT } from "@/lib/visa/types";
 
 export async function submitVisaRequestAction(fd: FormData) {
   const user = await requireUser("/dashboard/visa");
@@ -256,5 +257,75 @@ export async function saveVisaTemplateAction(fd: FormData) {
     await saveSetting("visa", template, admin.id);
     revalidatePath("/admin/visa");
     return "Visa letter template settings saved.";
+  });
+}
+
+export async function saveVisaCanvasTemplateAction(fd: FormData) {
+  const admin = await requireAdmin("/admin/visa");
+  await ensureVisaTable();
+
+  await guarded("/admin/visa?tab=template", async () => {
+    let layout: VisaLayout;
+    try {
+      layout = JSON.parse(String(fd.get("layout") ?? ""));
+      if (!Array.isArray(layout.fields)) throw new Error();
+    } catch {
+      layout = DEFAULT_VISA_LAYOUT;
+    }
+
+    const file_b64 = String(fd.get("file_b64") ?? "").trim();
+    const preview_b64 = String(fd.get("preview_b64") ?? "").trim();
+    const mime = str(fd, "mime", 40) || "application/pdf";
+    const width = Number(fd.get("width")) || 595;
+    const height = Number(fd.get("height")) || 842;
+    const timestamp = now();
+
+    if (file_b64) {
+      if (file_b64.length > 2_500_000) {
+        throw new PortalError("Template file is too large. Please upload a file under 1.8 MB.");
+      }
+
+      await run(
+        `INSERT INTO visa_templates (id, file_b64, preview_b64, mime, width, height, layout, updated_at)
+         VALUES ('default', ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           file_b64 = excluded.file_b64,
+           preview_b64 = excluded.preview_b64,
+           mime = excluded.mime,
+           width = excluded.width,
+           height = excluded.height,
+           layout = excluded.layout,
+           updated_at = excluded.updated_at`,
+        [file_b64, preview_b64 || null, mime, width, height, JSON.stringify(layout), timestamp]
+      );
+    } else {
+      const existing = await first<{ id: string }>("SELECT id FROM visa_templates WHERE id = 'default'");
+      if (existing) {
+        await run("UPDATE visa_templates SET layout = ?, updated_at = ? WHERE id = 'default'", [
+          JSON.stringify(layout),
+          timestamp,
+        ]);
+      } else {
+        await run(
+          `INSERT INTO visa_templates (id, file_b64, preview_b64, mime, width, height, layout, updated_at)
+           VALUES ('default', null, null, 'application/pdf', 595, 842, ?, ?)`,
+          [JSON.stringify(layout), timestamp]
+        );
+      }
+    }
+
+    revalidatePath("/admin/visa");
+    return "Visa letter template and field placements saved successfully.";
+  });
+}
+
+export async function deleteVisaCanvasTemplateAction(fd: FormData) {
+  await requireAdmin("/admin/visa");
+  await ensureVisaTable();
+
+  await guarded("/admin/visa?tab=template", async () => {
+    await run("DELETE FROM visa_templates WHERE id = 'default'");
+    revalidatePath("/admin/visa");
+    return "Uploaded template removed. Reverted to standard letterhead.";
   });
 }

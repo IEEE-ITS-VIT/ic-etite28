@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { first } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { renderVisaLetterPdf } from "@/lib/visa/render";
-import { ensureVisaTable, getVisaRequestById, getVisaRequestForUser } from "@/lib/visa/server";
+import { ensureVisaTable, getVisaRequestById, getVisaRequestForUser, getVisaTemplateRow } from "@/lib/visa/server";
 import { safeFilename } from "@/lib/certificates/render";
 import type { VisaRequestRow } from "@/lib/visa/types";
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   await ensureVisaTable();
-  const settings = await getSettings();
+  const [settings, tplRow] = await Promise.all([getSettings(), getVisaTemplateRow()]);
   const searchParams = req.nextUrl.searchParams;
   const requestId = searchParams.get("id");
   const isPreview = searchParams.get("preview") === "1";
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const pdfBytes = await renderVisaLetterPdf(sampleReq, settings.visa, { preview: true });
+    const pdfBytes = await renderVisaLetterPdf(sampleReq, tplRow, { preview: true });
     const disposition = isInline ? "inline" : 'attachment; filename="Visa_Invitation_Letter_Sample.pdf"';
 
     return new NextResponse(Buffer.from(pdfBytes), {
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 4. Generate the PDF dynamically on demand from inputs (never stored)
-  const pdfBytes = await renderVisaLetterPdf(targetReq, settings.visa);
+  const pdfBytes = await renderVisaLetterPdf(targetReq, tplRow);
   const cleanName = safeFilename(targetReq.passport_name || "delegate");
   const filename = `Visa_Invitation_Letter_${cleanName}.pdf`;
   const disposition = isInline ? `inline; filename="${filename}"` : `attachment; filename="${filename}"`;

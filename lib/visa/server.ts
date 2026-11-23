@@ -1,6 +1,7 @@
 import "server-only";
 import { all, first, run } from "@/lib/db";
-import type { VisaRequestRow, VisaRequestWithUser } from "@/lib/visa/types";
+import type { VisaLayout, VisaRequestRow, VisaRequestWithUser, VisaTemplateRow } from "@/lib/visa/types";
+import { DEFAULT_VISA_LAYOUT } from "@/lib/visa/types";
 
 let tableEnsured = false;
 
@@ -39,10 +40,20 @@ export async function ensureVisaTable(): Promise<void> {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_visa_requests_user ON visa_requests(user_id);
       CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests(status);
+
+      CREATE TABLE IF NOT EXISTS visa_templates (
+        id           TEXT PRIMARY KEY,
+        file_b64     TEXT,
+        preview_b64  TEXT,
+        mime         TEXT NOT NULL DEFAULT 'application/pdf',
+        width        INTEGER NOT NULL DEFAULT 595,
+        height       INTEGER NOT NULL DEFAULT 842,
+        layout       TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
     `);
     tableEnsured = true;
   } catch (err) {
-    // If index already exists or table is already there, proceed
     tableEnsured = true;
   }
 }
@@ -125,4 +136,21 @@ export async function getVisaStats(): Promise<{
     stats.total += r.count;
   }
   return stats;
+}
+
+export async function getVisaTemplateRow(): Promise<VisaTemplateRow | null> {
+  await ensureVisaTable();
+  return first<VisaTemplateRow>("SELECT * FROM visa_templates WHERE id = 'default'");
+}
+
+export async function getParsedVisaLayout(): Promise<VisaLayout> {
+  const row = await getVisaTemplateRow();
+  if (!row?.layout) return DEFAULT_VISA_LAYOUT;
+  try {
+    const parsed = JSON.parse(row.layout) as VisaLayout;
+    if (Array.isArray(parsed?.fields)) return parsed;
+    return DEFAULT_VISA_LAYOUT;
+  } catch {
+    return DEFAULT_VISA_LAYOUT;
+  }
 }
