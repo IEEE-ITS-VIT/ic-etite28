@@ -26,6 +26,19 @@ export async function GET(req: NextRequest) {
   const format = req.nextUrl.searchParams.get("format") ?? (scope === "all" || scope === "users" || scope === "events" ? "xlsx" : "xlsx");
   const stamp = new Date().toISOString().slice(0, 10);
 
+  try {
+    const { logAudit } = await import("@/lib/audit");
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action: "export.data",
+      category: "export",
+      path: "/api/admin/export",
+      details: { scope, format },
+    });
+  } catch {}
+
   // ──────────────────────── Excel (.xlsx) Export ────────────────────────
   if (format === "xlsx") {
     if (scope.startsWith("event:")) {

@@ -220,6 +220,20 @@ export async function updateVisaRequestStatusAction(fd: FormData) {
     revalidatePath("/admin/visa");
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/visa");
+
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: `visa.status_${status}`,
+        category: "records",
+        path: "/admin/visa",
+        details: { requestId: id, passportName: req.passport_name, status, admin_notes },
+      });
+    } catch {}
+
     return `Request for ${req.passport_name} updated to "${status}".`;
   });
 }
@@ -315,16 +329,40 @@ export async function saveVisaCanvasTemplateAction(fd: FormData) {
     }
 
     revalidatePath("/admin/visa");
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "visa.template_update",
+        category: "settings",
+        path: "/admin/visa",
+        details: "Updated visual visa letter canvas template layout and background",
+      });
+    } catch {}
     return "Visa letter template and field placements saved successfully.";
   });
 }
 
 export async function deleteVisaCanvasTemplateAction(fd: FormData) {
-  await requireAdmin("/admin/visa");
+  const admin = await requireAdmin("/admin/visa");
   await ensureVisaTable();
 
   await guarded("/admin/visa?tab=template", async () => {
     await run("DELETE FROM visa_templates WHERE id = 'default'");
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "visa.template_delete",
+        category: "settings",
+        path: "/admin/visa",
+        details: "Deleted visual visa template, reverted to standard letterhead",
+      });
+    } catch {}
     revalidatePath("/admin/visa");
     return "Uploaded template removed. Reverted to standard letterhead.";
   });

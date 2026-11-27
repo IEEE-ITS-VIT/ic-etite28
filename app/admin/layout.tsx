@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { requireAdmin } from "@/lib/auth/session";
 import { portalMetadata } from "@/lib/seo";
 import { SITE, SITE_NAME, type SiteKey } from "@/lib/site";
+import AdminAuditTracker from "@/components/admin/AdminAuditTracker";
 
 export const metadata = portalMetadata("Admin");
 
@@ -10,6 +11,7 @@ const COMMON_END = [
   { href: "/admin/invoices", label: "Invoices" },
   { href: "/admin/certificates", label: "Certificates (Excel)" },
   { href: "/admin/users", label: "Users & roles" },
+  { href: "/admin/audit", label: "Audit logs" },
   { href: "/admin/email", label: "Email & SMTP" },
 ];
 // Each website has its own admin portal with only its own sections.
@@ -45,6 +47,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const user = await requireAdmin("/admin");
   return (
     <div className="bg-[#F4F6FA]">
+      <AdminAuditTracker />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto px-4 py-2.5 sm:px-6">
           <span className="mr-2 shrink-0 rounded-full bg-brand-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-accent">{SITE_NAME} admin</span>

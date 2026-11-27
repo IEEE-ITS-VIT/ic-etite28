@@ -330,6 +330,17 @@ export async function saveSetting<K extends SettingsKey>(key: K, value: Settings
     [siteKey(key), JSON.stringify(value), now(), userId]
   );
   revalidateTag("settings");
+
+  try {
+    const { logAudit } = await import("@/lib/audit");
+    await logAudit({
+      userId,
+      action: `settings.${key}`,
+      category: "settings",
+      path: "/admin/settings",
+      details: `Saved ${key} configuration`,
+    });
+  } catch {}
 }
 
 export const formatInr = (n: number | null) => (n == null ? "—" : `INR ${n.toLocaleString("en-IN")}`);

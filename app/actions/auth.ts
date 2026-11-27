@@ -155,20 +155,71 @@ export async function loginAction(formData: FormData) {
     const ip = await clientIp();
     if (await isLimited("login-ip", ip)) flash(back, "error", `Too many failed logins from this network. Try again in ${LIMITS["login-ip"].minutes} minutes.`);
 
-    const user = await first<{ id: string; password_hash: string; role: string }>(`SELECT u.id, u.password_hash, ${roleSql("u")} AS role FROM users u WHERE u.email = ?`, [email]);
+    const user = await first<{ id: string; name: string; password_hash: string; role: string }>(`SELECT u.id, u.name, u.password_hash, ${roleSql("u")} AS role FROM users u WHERE u.email = ?`, [email]);
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       await run("INSERT INTO login_attempts (email, attempted_at) VALUES (?, ?)", [email, now()]);
       await recordHit("login-ip", ip);
+
+      const isAdminTarget = isBootstrapAdmin(email) || user?.role === "admin" || next.includes("/admin");
+      if (isAdminTarget) {
+        try {
+          const { logAudit } = await import("@/lib/audit");
+          await logAudit({
+            userId: user?.id ?? null,
+            userEmail: email,
+            userName: user?.name ?? null,
+            action: "admin.login_failed",
+            category: "auth",
+            path: "/login",
+            ipAddress: ip,
+            details: { reason: "Incorrect email or password", next },
+          });
+        } catch {}
+      }
+
       flash(back, "error", "Incorrect email or password.");
     }
     await run("DELETE FROM login_attempts WHERE email = ? OR attempted_at < ?", [email, since]);
     if (isBootstrapAdmin(email) && user.role !== "admin") await batch(setRoleStatements(user.id, "admin"));
     await createSession(user.id);
+
+    const isAdmin = user.role === "admin" || isBootstrapAdmin(email) || next.includes("/admin");
+    if (isAdmin) {
+      try {
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit({
+          userId: user.id,
+          userEmail: email,
+          userName: user.name,
+          action: "admin.login_success",
+          category: "auth",
+          path: "/login",
+          ipAddress: ip,
+          details: { next, role: user.role },
+        });
+      } catch {}
+    }
+
     redirect(next);
   });
 }
 
 export async function logoutAction() {
+  try {
+    const user = await getCurrentUser();
+    if (user && user.role === "admin") {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: "admin.logout",
+        category: "auth",
+        path: "/logout",
+        details: "Admin logged out",
+      });
+    }
+  } catch {}
   await destroySession();
   redirect("/login?ok=" + encodeURIComponent("You have been logged out."));
 }

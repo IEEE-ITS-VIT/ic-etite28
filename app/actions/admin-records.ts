@@ -34,7 +34,7 @@ const link = (fd: FormData) => {
 // ─── Conference ────────────────────────────────────────────────────────
 
 export async function updateConferenceRegistrationAction(fd: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = str(fd, "id", 40);
   const back = `/admin/conference#r-${id}`;
   await guarded(back, async () => {
@@ -49,6 +49,18 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
     ]);
     const pay = payment(fd);
     await applyPaymentStatus("conference", id, pay, str(fd, "payment_ref", 120) || null);
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "conference.registration_update",
+        category: "records",
+        path: "/admin/conference",
+        details: { registrationId: id, status, paymentStatus: pay },
+      });
+    } catch {}
     return pay === "paid" ? "Saved. If this was a new payment, the invoice was issued and emailed." : "Registration updated.";
   });
 }
@@ -64,22 +76,47 @@ export async function setUserRoleAction(fd: FormData) {
     if (!["participant", "evaluator", "admin"].includes(role)) throw new PortalError("Invalid role.");
     if (userId === admin.id && role !== "admin") throw new PortalError("You cannot remove your own admin access.");
     await batch(setRoleStatements(userId, role as Role));
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "users.role_update",
+        category: "users",
+        path: "/admin/users",
+        details: { targetUserId: userId, newRole: role },
+      });
+    } catch {}
     return "Role updated.";
   });
 }
 
 export async function verifyUserAction(fd: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const back = `/admin/users?q=${encodeURIComponent(str(fd, "q", 80))}`;
   await guarded(back, async () => {
-    await run("UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?", [now(), str(fd, "user_id", 40)]);
+    const targetUserId = str(fd, "user_id", 40);
+    await run("UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?", [now(), targetUserId]);
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "users.verify_email",
+        category: "users",
+        path: "/admin/users",
+        details: { targetUserId },
+      });
+    } catch {}
     return "Email marked as verified.";
   });
 }
 
 // Creates (or promotes) an evaluator and emails them a link to set their password.
 export async function inviteUserAction(fd: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const back = "/admin/users";
   await guarded(back, async () => {
     const email = str(fd, "email", 200).toLowerCase();
@@ -89,6 +126,18 @@ export async function inviteUserAction(fd: FormData) {
     const existing = await first<{ id: string; name: string }>("SELECT id, name FROM users WHERE email = ?", [email]);
     if (existing) {
       await batch(setRoleStatements(existing.id, role));
+      try {
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit({
+          userId: admin.id,
+          userEmail: admin.email,
+          userName: admin.name,
+          action: "users.role_update",
+          category: "users",
+          path: "/admin/users",
+          details: { targetEmail: email, targetName: existing.name, role },
+        });
+      } catch {}
       return `${existing.name} is now ${role === "admin" ? "an admin" : "an evaluator"}.`;
     }
     if (name.length < 2) throw new PortalError("Enter the person's name.");
@@ -116,12 +165,24 @@ export async function inviteUserAction(fd: FormData) {
         priority: 1,
       }),
     ]);
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "users.invite",
+        category: "users",
+        path: "/admin/users",
+        details: { targetEmail: email, targetName: name, role },
+      });
+    } catch {}
     return `Invitation queued for ${email}. Send it from Email & SMTP.`;
   });
 }
 
 export async function resendInvoiceAction(fd: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   await guarded("/admin/invoices", async () => {
     const inv = await first<{ id: string; number: string; bill_name: string; bill_email: string; items: string; amount: number; currency: string; payment_ref: string | null; purpose: string; ref_id: string }>(
       "SELECT * FROM invoices WHERE id = ?",
@@ -141,6 +202,18 @@ export async function resendInvoiceAction(fd: FormData) {
       },
       attachment: { type: "invoice", invoiceId: inv.id },
     });
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "invoices.resend",
+        category: "records",
+        path: "/admin/invoices",
+        details: { invoiceId: inv.id, invoiceNumber: inv.number, billEmail: inv.bill_email },
+      });
+    } catch {}
     return `Invoice ${inv.number} emailed to ${inv.bill_email}.`;
   });
 }
