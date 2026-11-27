@@ -1,171 +1,214 @@
-# ic-ETITE'28 — Website & Portal
+# ic-ETITE'28 — Conference Website & Unified Portal
 
-Website and participant/admin portal for **ic-ETITE'28**, the Third International Conference on Emerging Trends in Information Technology and Engineering, VIT Vellore (10–11 February 2028).
+Production website and portal for **ic-ETITE'28** (Third International Conference on Emerging Trends in Information Technology and Engineering, VIT Vellore, 10–11 February 2028).
 
-Live: https://ic-etite28.vercel.app
+Live URL: [https://ic-etite28.vercel.app](https://ic-etite28.vercel.app)
 
-It contains the public conference website plus a portal with accounts, an admin CMS, the **BOLT** hackathon (and any other event), evaluation, emails, certificates, invoices, **TechNext** stall booking and conference registration. Everything runs on free tiers.
+---
 
-## Three websites, one login
+## 1. System Architecture
 
-ic-ETITE'28 (this repo, port 3000), **BOLT 3.0** (`IEEEITSVIT/BOLT-3.0`, port 3001) and **TechNext '28** (`IEEEITSVIT/TECHNEXT-3.O`, port 3002) are separate websites with separate admin portals, CMS and payment gateways. They share the D1 database (users, so one account works on all three) and the SMTP account. This repo holds the database migrations and the D1 gateway Worker for all three.
+The ecosystem consists of three federated applications sharing a single Cloudflare D1 database, unified authentication (Single Sign-On), Upstash Redis caching, and an asynchronous audit queue:
 
-- BOLT and TechNext pages, events, evaluation and stall booking now live on their own websites. The old `/hackathon`, `/technext`, `/events` and `/evaluate` links here redirect to the addresses set in **Admin → Site content → Website links**.
-- Admin roles are per site: `users.role` for ic-ETITE, the `site_roles` table for BOLT and TechNext.
-- `lib/site.ts` names the site; shared code is identical in all three repos.
+| Application | Role | Repository | Default Port | Production Domain |
+| :--- | :--- | :--- | :--- | :--- |
+| **ic-ETITE'28** (This repo) | Conference Website, Registrations, Invoices, Gateway | `IEEEITSVIT/ic-etite28` | `3000` | `https://ic-etite28.vercel.app` |
+| **BOLT 3.0** | Flagship Hackathon, Team Scoring, Rounds, Evaluations | `IEEEITSVIT/BOLT-3.0` | `3001` | `https://bolt-3-0.vercel.app` |
+| **TechNext '28** | Technology Expo, Stall Bookings, Industry Showcase | `IEEEITSVIT/TECHNEXT-3.O` | `3002` | `https://technext-3-0.vercel.app` |
 
-## Features
+### Key Shared Architecture Principles
+- **One User Account Across All Sites:** The `users` table is unified. An account created on any of the three websites immediately logs into the other two.
+- **Federated Redirection:** Visiting `/hackathon` or `/technext` on the conference domain automatically redirects visitors to the respective portal.
+- **Site-Scoped Roles:** Admins can be global or scoped per site using the `site_roles` table. Super-admin `ieeeitsvitscore@gmail.com` retains permanent root authorization.
+- **Low-Latency Caching & Events:** Read-heavy portal settings and sessions are cached via Upstash Redis (`lib/cache/redis.ts`). Background audit logs are pushed asynchronously to Upstash QStash/Kafka (`lib/queue/kafka.ts`).
 
-**Public website**: home, call for papers, research tracks, important dates, registration and fees, keynote speakers, committees, advisory board, sponsorship, venue, hotels, visa, contact, previous editions, BOLT and TechNext pages. It includes SEO metadata, a sitemap and robots.txt.
+---
 
-**Accounts**
-- Sign up with email verification (6-digit code), log in, forgot / reset password.
-- Profile page.
-- Roles: participant, evaluator, admin.
-- Rate limits (`lib/auth/rateLimit.ts`):
+## 2. Cloudflare D1 Database & Gateway
 
-  | What | Limit |
-  | --- | --- |
-  | Failed logins per email | 8 per 15 min |
-  | Failed logins per network | 40 per 15 min |
-  | Password-reset emails per address | 3 per hour |
-  | Password-reset requests per network | 15 per hour |
-  | Signups per network | 30 per hour |
-  | Verification-code resends | 5 per hour, and 1 per minute |
-  | Wrong verification codes | 6 per 15 min, then the code is cancelled |
+All persistent data is stored in a serverless SQLite Cloudflare D1 database (`ieeeitsvit`). Portals access D1 through a zero-latency HTTPS Gateway Worker (`workers/d1-gateway`).
 
-  Network limits are generous because many students share one campus IP.
+### Database Identifiers
+- **Database Name:** `ieeeitsvit` (or `icetite`)
+- **Database ID:** `6d59618c-0ce8-4a86-9773-9918c1733e1e`
+- **Cloudflare Account ID:** `dfc2c80c18c70fffd6da339251650e04`
 
-**Admin CMS** (`/admin`). Admins can change all of these without touching code:
-- **Page content**: every text and image on every page as a form field, with a live preview (desktop / tablet / phone). Texts can be re-coloured, resized, bolded or hidden. Nothing changes until you click Publish.
-- **Lists**: committees, advisory boards, team and research tracks. Add, remove, reorder and edit entries, with a live preview.
-- **Site content**:
-  - important dates and countdown
-  - fees and early-bird pricing
-  - deadlines and prize pools
-  - BOLT / TechNext visibility
-  - scrolling announcement bar
-  - sponsorship packages
-  - invoice template
-  - payment links / VIT payment API
-- **Appearance**: theme colours, fonts and text size.
-- **Hotels**: add and edit the hotels shown on the site.
+### Schema Migrations (`db/migrations/`)
+The database schema is managed through versioned SQL migrations:
+- `0001_init.sql`: Core users, sessions, events, registrations, settings, and outbox tables.
+- `0002_team_name_unique.sql` to `0009_rate_limits.sql`: Team limits, invoices, scoring rounds, and security rate limits.
+- `0010_sites.sql`: Multi-portal separation and `site_roles`.
+- `0011_visa_letters.sql` & `0012_visa_templates.sql`: Visa invitation letter generation.
+- `0013_audit_logs.sql`: Security audit logging and change tracking.
+- `0014_invoice_templates.sql`: Dynamic invoice generation templates.
+- `0015_performance_indexes.sql`: Composite performance indexes for sessions, registrations, bookings, and invoices.
 
-**Events (BOLT hackathon and others)**
-- Registration: hidden / unlisted / public; open or invite-list only; solo or team with team codes (team names must be unique); early-bird fees and prize pools.
-- Rounds:
-  - the admin sets how many rounds there are
-  - each round has its own submission links, scoring categories and deadline
-- Scoring: multiple evaluators score each team. Averaged scores, top-N or minimum-score qualification to the next round, and scores can be published to teams.
-- Results and winners, with emails drafted by the admin.
-- Certificates:
-  - template designer, PDFs made on demand
-  - email or download
-  - generate from an Excel sheet, matched to each person's login email
-- Export everything as a ZIP of CSVs, then delete the participant data.
-
-**TechNext** expo stall booking: admin approval, stall types and prices, early bird, payments.
-
-**Conference registration**: registration tiers, early bird, delegate confirmation and payment reconciliation.
-
-**Invoices**: generated automatically when a payment succeeds, each with a unique number. The admin sets the template.
-
-**Email**
-- Gmail / Google Workspace SMTP with a send queue that respects the daily sending limit.
-- Automatic notices with editable templates.
-- A **separate SMTP account for verification codes and password-reset links** (see below).
-
-## Tech stack
-
-| Piece | Where | Notes |
-| --- | --- | --- |
-| Website + portal | Next.js 15 (App Router), React 19, Tailwind CSS, TypeScript, hosted on Vercel | Server actions + API routes |
-| Database | Cloudflare D1 `icetite` | Schema in `db/migrations/` |
-| D1 gateway | Cloudflare Worker (`workers/d1-gateway`) | The site reaches D1 only through it, using a shared secret |
-| Email | Gmail / Google Workspace SMTP via nodemailer | Queue in `email_outbox`; daily Vercel cron sends what is left |
-| PDFs | pdf-lib | Certificates and invoices are made when needed, never stored |
-
-## Email accounts and limits
-
-Admin → **Email & SMTP** has two SMTP accounts:
-
-- **Main SMTP**: notices, bulk emails, certificates and invoices.
-- **OTP & password-reset SMTP**: only verification codes and password-reset links.
-  - Any field left empty uses the main account's value, so at first both use the same login and password.
-  - Fill in another account later to give codes their own daily limit.
-  - Codes and links that cannot be sent within 30 minutes are dropped instead of arriving after they have expired. The user can simply request a new one.
-
-Each SMTP login has its own 24-hour quota, set as the "daily sending limit":
-
-| Account type | Google's limit |
-| --- | --- |
-| Personal Gmail | about 500/day |
-| Google Workspace (e.g. @vit.ac.in) | 2,000/day |
-
-Set the daily sending limit a little below Google's figure. Bulk emails over the limit wait in the queue and go out the next day.
-
-## Project layout
-
-```
-app/                 pages, portal (dashboard, events, evaluate, admin), API routes, server actions
-components/          site sections, portal UI, components/cms (CMS text/image/list rendering), components/admin
-lib/                 db client, auth, settings, pricing, payments, invoices, notifications, email, certificates, collections
-data/                default content (committees, advisory board, team, tracks)
-db/migrations/       D1 schema (apply in order)
-workers/d1-gateway/  Cloudflare Worker that exposes D1 to the site
-scripts/             db setup / seed, CMS codemod
-```
-
-## Setup
-
+To execute all migrations against the remote Cloudflare D1 database:
 ```bash
-npm install
-cp .env.example .env.local   # then fill in the values
+for file in db/migrations/*.sql; do
+  npx wrangler d1 execute ieeeitsvit --remote --file="$file"
+done
 ```
 
-Environment variables (see `.env.example`):
-
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | Public URL of the site |
-| `D1_GATEWAY_URL`, `D1_GATEWAY_SECRET` | D1 gateway Worker URL and its shared secret |
-| `SESSION_SECRET` | 32+ random characters; also encrypts SMTP passwords stored in D1 |
-| `ADMIN_EMAILS` | Comma-separated emails that become admins |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | First admin, created by `npm run db:setup` |
-| `CRON_SECRET` | Protects `/api/cron/email` |
-| `SMTP_*`, `SMTP_OTP_*` (optional) | Override the SMTP settings saved in the admin |
-
-Never commit `.env.local`, `.env.vercel.local` or `workers/d1-gateway/.dev.vars`. They are git-ignored.
-
-### Database and gateway (Cloudflare)
-
+### Deploying the D1 Gateway Worker (`workers/d1-gateway`)
+The gateway translates HTTP POST requests into prepared SQL statements:
 ```bash
 cd workers/d1-gateway
-npx wrangler d1 migrations apply icetite --remote
+npm install
+npx wrangler secret put GATEWAY_SECRET   # Enter your secure random secret
 npx wrangler deploy
-npx wrangler secret put GATEWAY_SECRET   # same value as D1_GATEWAY_SECRET
+```
+Copy the published worker URL (e.g., `https://icetite-d1-gateway.<subdomain>.workers.dev`) and set it as `D1_GATEWAY_URL` in your `.env.local` / deployment settings.
+
+---
+
+## 3. Backups, Recovery & Read Replicas
+
+### Automated Cloudflare Time Travel (Point-in-Time Recovery)
+Cloudflare D1 automatically captures Continuous Point-in-Time backups (retained for 30 days).
+```bash
+# View backup bookmarks and timeline
+./scripts/d1-backup-restore.sh info ieeeitsvit
+
+# Restore database to any point in time (RFC3339 format)
+./scripts/d1-backup-restore.sh timetravel 2026-11-28T00:00:00Z ieeeitsvit
 ```
 
-Create the first admin and the default settings (safe to run again):
+### Manual & Automated SQL Snapshots
+Full remote schema and data exports can be generated and restored using the provided backup utility:
+```bash
+# Create an encrypted SQL snapshot in ./backups/
+./scripts/d1-backup-restore.sh backup ieeeitsvit
+
+# Restore an existing SQL snapshot to the database
+./scripts/d1-backup-restore.sh restore ./backups/d1_ieeeitsvit_20261128_000000.sql ieeeitsvit
+```
+
+### Parallel Sandbox / Replica Creation
+To spin up a separate sandbox replica database for high-load benchmarking or security tests without touching production:
+```bash
+./scripts/d1-backup-restore.sh replica-create ieeeitsvit-staging ieeeitsvit
+```
+
+### In-App Portal Backup
+Administrators can download live JSON or SQL dumps directly from the running portal:
+- Endpoint: `GET /api/admin/backup?format=sql` or `GET /api/admin/backup?format=json`
+- Access: Restricted to authenticated administrators.
+
+### Global Read Replicas
+Cloudflare D1 supports automatic read replication. In `workers/d1-gateway/wrangler.toml`, read replication is enabled so read queries are served from edge nodes closest to the user while mutations route to the primary database.
+
+---
+
+## 4. Redis Caching & Queue Integration
+
+### Cache Structure (`lib/cache/redis.ts`)
+The portal integrates with Upstash Redis via HTTP REST protocol (avoiding serverless TCP connection pooling issues). If environment variables are absent, an in-memory TTL cache acts as an automatic fallback.
+
+- **Settings (`settings:${SITE}`):** TTL 600s. Invalidated immediately upon any change in Admin Settings.
+- **Sessions (`sess:${hash}`):** TTL 45s. Invalidated immediately upon logout or password reset.
+
+### Event Streaming (`lib/queue/kafka.ts`)
+Audit events, login telemetry, and payment reconciliation events are pushed to Upstash QStash / Kafka topic `portal-audit-events` without blocking HTTP user transactions.
+
+---
+
+## 5. Deployment Guide (Deploy Anywhere)
+
+### Option A: Vercel Serverless (Recommended Cloud Deployment)
+1. Import repository into Vercel.
+2. In **Settings -> Environment Variables**, configure all variables from Section 6.
+3. In **Integrations**, connect the **Upstash** integration to automatically populate Redis and QStash credentials.
+4. Deploy the project.
+
+### Option B: Docker / Container Deployment (Any VPS / Cloud Server)
+Each repository contains a production-ready, multi-stage `Dockerfile` and `docker-compose.yml`.
 
 ```bash
-npm run db:setup -- .env.local
+# 1. Clone the repository on your server
+git clone https://github.com/IEEEITSVIT/ic-etite28.git
+cd ic-etite28
+
+# 2. Create your production environment file
+cp .env.example .env.local
+nano .env.local
+
+# 3. Build and launch with Docker Compose
+docker compose up -d --build
 ```
+The application will launch on port `3000` inside an isolated Linux container with standalone output optimization.
 
-### Local development
-
+### Option C: PM2 / Direct Node.js on a Linux Server
 ```bash
-npx wrangler d1 migrations apply icetite --local --config workers/d1-gateway/wrangler.toml
-npx wrangler dev --config workers/d1-gateway/wrangler.toml --local --port 8788
-npm run dev
+# 1. Install Node.js 20+ and PM2
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm install -g pm2
+
+# 2. Build standalone output
+export STANDALONE=true
+npm ci
+npm run build
+
+# 3. Run standalone server via PM2
+pm2 start .next/standalone/server.js --name "icetite-portal" -- -p 3000
+pm2 save
+pm2 startup
 ```
 
-Set `D1_GATEWAY_URL=http://127.0.0.1:8788` in `.env.local`. Without SMTP configured, emails are printed to the server console in development.
+### Nginx Reverse Proxy with HTTPS SSL (Certbot)
+Place this configuration at `/etc/nginx/sites-available/icetite`:
+```nginx
+server {
+    server_name icetite.itsvit.ac.in;
 
-### Deploying
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+Obtain SSL certificate:
+```bash
+sudo certbot --nginx -d icetite.itsvit.ac.in
+```
 
-Push to the GitHub repository connected to Vercel. Add every environment variable in Vercel → Project → Settings → Environment Variables. Apply new files in `db/migrations/` to the remote database **before** deploying code that uses them.
+---
 
-## More documentation
+## 6. Complete Environment Variables Catalog
 
-[`PORTAL.md`](PORTAL.md) is the admin guide. It covers roles and URLs, every admin section, pricing rules, rounds, scoring, certificates, invoices, payments and the after-event export.
+| Variable | Required | Description | Example / Default |
+| :--- | :--- | :--- | :--- |
+| `D1_GATEWAY_URL` | Yes | HTTPS endpoint of the Cloudflare D1 Gateway Worker | `https://icetite-d1-gateway.workers.dev` |
+| `D1_GATEWAY_SECRET` | Yes | Shared authorization secret between Next.js and D1 Worker | `64-char-random-secret` |
+| `SESSION_SECRET` | Yes | 32+ character key for encrypting sessions and SMTP configs | `min-32-character-random-hex-key` |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Base URL of this portal | `https://ic-etite28.vercel.app` |
+| `NEXT_PUBLIC_BOLT_URL` | Yes | Base URL of the BOLT 3.0 hackathon website | `https://bolt-3-0.vercel.app` |
+| `NEXT_PUBLIC_TECHNEXT_URL`| Yes | Base URL of the TechNext '28 expo website | `https://technext-3-0.vercel.app` |
+| `ADMIN_EMAILS` | No | Comma-separated emails automatically granted Admin role | `ieeeitsvitscore@gmail.com` |
+| `UPSTASH_REDIS_REST_URL` | Optional | Upstash Redis REST URL for sub-millisecond caching | `https://...upstash.io` |
+| `UPSTASH_REDIS_REST_TOKEN`| Optional | Upstash Redis REST Bearer Token | `AX...` |
+| `UPSTASH_KAFKA_REST_URL` | Optional | Upstash QStash / Kafka REST URL for async audit trail | `https://qstash.upstash.io` |
+| `UPSTASH_KAFKA_REST_USERNAME` | Optional | Kafka / QStash Client Username | `user_...` |
+| `UPSTASH_KAFKA_REST_PASSWORD` | Optional | Kafka / QStash Client Password | `pass_...` |
+| `CRON_SECRET` | Yes | Bearer token authenticating Vercel / external cron triggers | `cron-random-secret` |
+| `SMTP_HOST` | Optional | Fallback SMTP host (can also be configured in Admin CMS) | `smtp.gmail.com` |
+| `SMTP_PORT` | Optional | Fallback SMTP port | `465` |
+| `SMTP_USER` | Optional | Fallback SMTP username / email address | `ieeeitsvitscore@gmail.com` |
+| `SMTP_PASS` | Optional | Fallback SMTP password or Google App Password | `xxxx xxxx xxxx xxxx` |
+
+---
+
+## 7. Security, Failover & Administration
+
+- **Default Root Administrator:** `ieeeitsvitscore@gmail.com` is permanently protected in code from demotion or deletion.
+- **Refund Protection:** Refunds cannot be executed without entering the dedicated refund authorization password, which is stored securely as a cryptographic hash in D1 and configurable only by `ieeeitsvitscore@gmail.com`.
+- **Payment Immutability:** Once a payment transaction is reconciled via payment webhooks/APIs, its status is locked against manual tampering.
+- **Database Connection Failure Resilience:** If the database gateway experiences transient connectivity drops, portals display an informative status alert and automatically retry with exponential backoff rather than crashing.

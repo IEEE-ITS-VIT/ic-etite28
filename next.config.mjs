@@ -26,6 +26,7 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  output: process.env.STANDALONE === 'true' ? 'standalone' : undefined,
   // Certificate template uploads go through server actions.
   experimental: { serverActions: { bodySizeLimit: "3mb" } },
   images: {

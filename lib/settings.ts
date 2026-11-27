@@ -347,7 +347,7 @@ export async function saveSetting<K extends SettingsKey>(key: K, value: Settings
       path: "/admin/settings",
       details: `Saved ${key} configuration`,
     });
-  } catch {}
+  } catch { }
 }
 
 export const formatInr = (n: number | null) => (n == null ? "—" : `INR ${n.toLocaleString("en-IN")}`);
