@@ -3,7 +3,19 @@ import Image from "@/components/cms/EImage";
 import { ExternalLink, MapPin, Mail, Award, Sparkles, ChevronRight } from "lucide-react";
 import E from "@/components/cms/E";
 
-export default function Footer({ visibility = { bolt: true, technext: true } }: { visibility?: { bolt: boolean; technext: boolean } }) {
+export default function Footer({
+  visibility = { bolt: true, technext: true },
+  links = {
+    icetite: "https://ic-etite28.vercel.app",
+    bolt: process.env.NEXT_PUBLIC_BOLT_URL || "https://bolt-3-0.vercel.app",
+    technext: process.env.NEXT_PUBLIC_TECHNEXT_URL || "https://technext-3-0.vercel.app",
+  },
+}: {
+  visibility?: { bolt: boolean; technext: boolean };
+  links?: { icetite: string; bolt: string; technext: string };
+}) {
+  const boltUrl = links.bolt || "https://bolt-3-0.vercel.app";
+  const technextUrl = links.technext || "https://technext-3-0.vercel.app";
   return (
     <footer className="bg-brand-primary-dark text-white border-t border-white/10 select-none">
       {/* Top Branding Bar with Dual Official Logos */}
@@ -134,7 +146,7 @@ export default function Footer({ visibility = { bolt: true, technext: true } }: 
               </li>
               {visibility.bolt && (
                 <li>
-                  <Link className="hover:text-white transition-colors block" href="/hackathon"><E f="c.Footer">{"BOLT 3.0 Hackathon"}</E></Link>
+                  <a className="hover:text-white transition-colors block" href={boltUrl}><E f="c.Footer">{"BOLT 3.0 Hackathon"}</E></a>
                 </li>
               )}
               <li>
@@ -192,18 +204,18 @@ export default function Footer({ visibility = { bolt: true, technext: true } }: 
                 <p className="text-[11px] text-brand-accent font-bold uppercase tracking-wider"><E f="c.Footer">{"Co-Located Flagship Events"}</E></p>
                 <div className="flex items-center gap-3 pt-0.5">
                   {visibility.technext && (
-                  <Link href="/technext" title="TechNext '28 Industrial Expo" className="hover:opacity-85 transition-opacity">
+                  <a href={technextUrl} title="TechNext '28 Industrial Expo" className="hover:opacity-85 transition-opacity">
                     <div className="relative h-6 w-24">
                       <Image src="/logos/technext-logo.png" alt="TechNext '28" fill sizes="100px" className="object-contain object-left" />
                     </div>
-                  </Link>
+                  </a>
                   )}
                   {visibility.bolt && (
-                  <Link href="/hackathon" title="BOLT 3.0 National Hackathon" className="hover:opacity-85 transition-opacity">
+                  <a href={boltUrl} title="BOLT 3.0 National Hackathon" className="hover:opacity-85 transition-opacity">
                     <div className="relative h-6 w-20">
                       <Image src="/logos/bolt-logo-white.png" alt="BOLT 3.0" fill sizes="80px" className="object-contain object-left" />
                     </div>
-                  </Link>
+                  </a>
                   )}
                 </div>
               </div>

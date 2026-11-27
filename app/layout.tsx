@@ -123,7 +123,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { visibility, ticker, appearance, texts, images } = await getSettings();
+  const { visibility, ticker, appearance, texts, images, links } = await getSettings();
   return (
     <html lang="en" data-scroll-behavior="smooth" className={fontVariables} suppressHydrationWarning>
       <head>
@@ -191,9 +191,9 @@ export default async function RootLayout({
         <CmsProvider texts={texts} images={images}>
           <StartupAnimation />
           <TickerBar ticker={ticker} />
-          <Navbar visibility={visibility} />
+          <Navbar visibility={visibility} links={links} />
           <main className="flex-1">{children}</main>
-          <Footer visibility={visibility} />
+          <Footer visibility={visibility} links={links} />
           <BackToTop />
         </CmsProvider>
       </body>

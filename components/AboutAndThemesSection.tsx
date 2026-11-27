@@ -235,13 +235,13 @@ export default function AboutAndThemesSection() {
                 <span><E f="c.AboutAndThemesSection">{"Visit IEEE ITS Chapter Official Website"}</E></span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
-              <Link
-                href="/hackathon"
+              <a
+                href={process.env.NEXT_PUBLIC_BOLT_URL || "https://bolt-3-0.vercel.app"}
                 className="btn-outline inline-flex items-center gap-2 text-xs py-2.5 px-5"
               >
                 <span><E f="c.AboutAndThemesSection">{"Explore BOLT 3.0 Hackathon"}</E></span>
                 <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              </a>
             </div>
           </div>
         </div>

@@ -316,6 +316,17 @@ export async function renderInvoicePdf(inv: InvoiceRow, tpl: InvoiceTemplate): P
 
 export async function invoicePdf(inv: InvoiceRow) {
   const { invoice } = await getSettings();
+  try {
+    const { getInvoiceTemplateRow } = await import("@/lib/invoice-template/server");
+    const tplRow = await getInvoiceTemplateRow("default");
+    if (tplRow) {
+      const { renderInvoicePdfWithTemplate } = await import("@/lib/invoice-template/render");
+      const bytes = await renderInvoicePdfWithTemplate(inv, tplRow, invoice);
+      return { bytes, filename: `invoice-${inv.number.replace(/[^\w-]+/g, "-")}.pdf` };
+    }
+  } catch (err) {
+    console.error("Error rendering invoice with template, using standard layout:", err);
+  }
   return { bytes: await renderInvoicePdf(inv, invoice), filename: `invoice-${inv.number.replace(/[^\w-]+/g, "-")}.pdf` };
 }
 

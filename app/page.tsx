@@ -20,7 +20,7 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col">
       {/* 1. Hero with Video Background, Countdown Bar & Credential Strips */}
-      <Hero milestones={milestones} countdownTarget={settings.conferenceStart} paperDeadline={paperDeadline} />
+      <Hero milestones={milestones} countdownTarget={settings.conferenceStart} paperDeadline={paperDeadline} technextUrl={settings.links.technext} />
 
       {/* 2. About IC-ETITE, Theme, About VIT, About SCORE, About IEEE ITS (Old-School Photo Frames & Hyperlinks) */}
       <AboutAndThemesSection />

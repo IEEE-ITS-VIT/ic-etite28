@@ -22,10 +22,12 @@ export default function Hero({
   milestones,
   countdownTarget,
   paperDeadline = "05 October 2027",
+  technextUrl = process.env.NEXT_PUBLIC_TECHNEXT_URL || "https://technext-3-0.vercel.app",
 }: {
   milestones?: CountdownMilestone[];
   countdownTarget?: string;
   paperDeadline?: string;
+  technextUrl?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [brochureModalOpen, setBrochureModalOpen] = useState(false);
@@ -172,15 +174,15 @@ export default function Hero({
                 <span className="tracking-wide"><E f="c.Hero">{"Download Brochure"}</E></span>
               </a>
 
-              {/* Register for Expo Button (redirects to TechNext '28) */}
-              <Link
-                href="/technext"
+              {/* Register for Expo Button (directs directly to TechNext '28) */}
+              <a
+                href={technextUrl}
                 className="btn-gold group flex items-center gap-2.5 px-7 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-bold shadow-xl transition-all hover:scale-105"
                 aria-label="Register for Expo"
               >
                 <span><E f="c.Hero">{"Register for Expo"}</E></span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[2.5]" />
-              </Link>
+              </a>
 
               {/* Call for Papers link beside it */}
               <Link

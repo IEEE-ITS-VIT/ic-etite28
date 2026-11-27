@@ -21,7 +21,19 @@ interface NavItem {
   alignRight?: boolean;
 }
 
-export default function Navbar({ visibility = { bolt: true, technext: true } }: { visibility?: { bolt: boolean; technext: boolean } }) {
+export default function Navbar({
+  visibility = { bolt: true, technext: true },
+  links = {
+    icetite: "https://ic-etite28.vercel.app",
+    bolt: process.env.NEXT_PUBLIC_BOLT_URL || "https://bolt-3-0.vercel.app",
+    technext: process.env.NEXT_PUBLIC_TECHNEXT_URL || "https://technext-3-0.vercel.app",
+  },
+}: {
+  visibility?: { bolt: boolean; technext: boolean };
+  links?: { icetite: string; bolt: string; technext: string };
+}) {
+  const boltUrl = links.bolt || "https://bolt-3-0.vercel.app";
+  const technextUrl = links.technext || "https://technext-3-0.vercel.app";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mobileExpandedDropdown, setMobileExpandedDropdown] = useState<string | null>(null);
@@ -246,8 +258,8 @@ export default function Navbar({ visibility = { bolt: true, technext: true } }: 
             <div className="flex items-center gap-2 sm:gap-3 xl:gap-4 shrink-0">
               {/* TechNext '28 Tag */}
               {visibility.technext && (
-              <Link
-                href="/technext"
+              <a
+                href={technextUrl}
                 className="hidden lg:flex items-center justify-center h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-white/10 hover:bg-white/20 border border-[#F37021]/80 shadow-[0_0_12px_rgba(243,112,33,0.28)] transition-all hover:scale-105 shrink-0"
                 title="TechNext '28 National Industrial Expo"
               >
@@ -260,13 +272,13 @@ export default function Navbar({ visibility = { bolt: true, technext: true } }: 
                     className="object-contain"
                   />
                 </div>
-              </Link>
+              </a>
               )}
 
               {/* BOLT 3.0 Hackathon Tag */}
               {visibility.bolt && (
-              <Link
-                href="/hackathon"
+              <a
+                href={boltUrl}
                 className="hidden lg:flex items-center justify-center h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-brand-primary-dark hover:bg-[#00244D] border border-[#CCFF00] shadow-[0_0_12px_rgba(204,255,0,0.28)] transition-all hover:scale-105 shrink-0"
                 title="Register for BOLT 3.0 National Flagship Hackathon"
               >
@@ -279,7 +291,7 @@ export default function Navbar({ visibility = { bolt: true, technext: true } }: 
                     className="object-contain"
                   />
                 </div>
-              </Link>
+              </a>
               )}
 
               {/* VIT Logo */}
@@ -470,11 +482,11 @@ export default function Navbar({ visibility = { bolt: true, technext: true } }: 
                       <p className="text-xs text-white/70"><E f="c.Navbar">{"National Flagship 24h Sprint"}</E></p>
                     </div>
                   </div>
-                  <Link
-                    href="/hackathon"
+                  <a
+                    href={boltUrl}
                     onClick={() => setMobileOpen(false)}
                     className="px-3 py-1.5 rounded-lg bg-[#CCFF00] text-brand-primary-dark font-bold text-xs tracking-wider uppercase hover:bg-white transition-colors shrink-0"
-                  ><E f="c.Navbar">{"Explore"}</E></Link>
+                  ><E f="c.Navbar">{"Explore"}</E></a>
                 </div>
                 )}
 
@@ -496,11 +508,11 @@ export default function Navbar({ visibility = { bolt: true, technext: true } }: 
                       <p className="text-xs text-white/70"><E f="c.Navbar">{"Industrial Expo & Stalls"}</E></p>
                     </div>
                   </div>
-                  <Link
-                    href="/technext"
+                  <a
+                    href={technextUrl}
                     onClick={() => setMobileOpen(false)}
                     className="px-3 py-1.5 rounded-lg bg-[#84E320] text-[#0B0324] font-bold text-xs tracking-wider uppercase hover:bg-white transition-colors shrink-0"
-                  ><E f="c.Navbar">{"Explore"}</E></Link>
+                  ><E f="c.Navbar">{"Explore"}</E></a>
                 </div>
                 )}
               </div>
