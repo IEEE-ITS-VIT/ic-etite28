@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { DEFAULT_SETTINGS, THEME_COLORS, getSettings, saveSetting, type DateItem, type EarlyBird, type FeeTier, type Prize, type StallType, type ThemeColorKey } from "@/lib/settings";
 import { FONT_OPTIONS, type FontKey } from "@/lib/fonts";
@@ -51,8 +51,11 @@ function prizes(fd: FormData, prefix: string): Prize[] {
 
 // Public pages read settings through a cached getter; refresh the pages that show them.
 function refreshPublic() {
-  for (const p of ["/", "/important-dates", "/registration", "/call-for-papers", "/hackathon", "/technext"]) revalidatePath(p);
-  revalidatePath("/", "layout");
+  for (const p of ["/", "/important-dates", "/registration", "/call-for-papers", "/hackathon", "/technext", "/admin/settings", "/admin/content"]) {
+    try { revalidatePath(p); } catch {}
+  }
+  try { revalidatePath("/", "layout"); } catch {}
+  try { revalidateTag("settings"); } catch {}
 }
 
 export async function saveDatesAction(fd: FormData) {

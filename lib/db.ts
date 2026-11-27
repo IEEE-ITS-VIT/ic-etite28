@@ -12,19 +12,40 @@ export function isDbConfigured(): boolean {
   return Boolean(GATEWAY_URL && GATEWAY_SECRET);
 }
 
-async function call<T>(path: "/query" | "/batch", body: unknown): Promise<T> {
+async function call<T>(path: "/query" | "/batch", body: unknown, retries = 2): Promise<T> {
   if (!GATEWAY_URL || !GATEWAY_SECRET) {
     throw new Error("Database is not configured (set D1_GATEWAY_URL and D1_GATEWAY_SECRET).");
   }
-  const res = await fetch(`${GATEWAY_URL}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${GATEWAY_SECRET}` },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
-  if (!res.ok) throw new Error(`D1 error: ${data.error ?? res.statusText}`);
-  return data;
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${GATEWAY_URL}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${GATEWAY_SECRET}` },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000), // 8s timeout to prevent hung connection
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
+      if (!res.ok) {
+        if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(`D1 error: ${data.error ?? res.statusText}`);
+      }
+      return data;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to communicate with database gateway.");
 }
 
 // D1 rejects `undefined` bindings; normalise to null and booleans to 0/1.

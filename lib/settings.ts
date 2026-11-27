@@ -321,7 +321,7 @@ async function loadSettings(): Promise<Settings> {
   }
 }
 
-export const getSettings = unstable_cache(loadSettings, ["site-settings"], { tags: ["settings"], revalidate: 600 });
+export const getSettings = unstable_cache(loadSettings, ["site-settings"], { tags: ["settings"], revalidate: 60 });
 
 export async function saveSetting<K extends SettingsKey>(key: K, value: Settings[K], userId: string) {
   await run(

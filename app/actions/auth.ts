@@ -17,8 +17,8 @@ import { LIMITS, clearHits, clientIp, isLimited, recordHit, takeToken } from "@/
 const safeNext = (v: string) => (v.startsWith("/") && !v.startsWith("//") ? v : "/dashboard");
 const withNext = (path: string, next: string) => (next && next !== "/dashboard" ? `${path}?next=${encodeURIComponent(next)}` : path);
 
-const CODE_TTL_MIN = 15;
-const RESET_TTL_MIN = 30;
+const CODE_TTL_MIN = 10; // 10 minutes OTP TTL
+const RESET_TTL_MIN = 15; // 15 minutes password reset TTL
 
 async function issueVerificationCode(user: { id: string; email: string; name: string }) {
   const code = newNumericCode(6);
