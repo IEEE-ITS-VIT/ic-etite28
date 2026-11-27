@@ -11,11 +11,8 @@ export type AuditCategory =
   | "content"
   | "users"
   | "records"
-  | "navigation"
-  | "click"
   | "export"
-  | "email"
-  | "system";
+  | "email";
 
 export type AuditEntry = {
   id?: string;
@@ -72,6 +69,8 @@ export async function ensureAuditTable(): Promise<void> {
     await run(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_audit_logs_category ON audit_logs(category)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_email, created_at DESC)`);
+    // Audit policy: only store logins, changes, and bookings. Purge any legacy click or telemetry records.
+    await run(`DELETE FROM audit_logs WHERE category IN ('click', 'navigation', 'system')`);
     tableEnsured = true;
   } catch (err) {
     console.warn("Could not ensure audit_logs table:", err);
@@ -80,6 +79,15 @@ export async function ensureAuditTable(): Promise<void> {
 
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
+    // Audit policy: strictly ignore clicks, navigations, and unwanted telemetry
+    if (
+      entry.category === ("click" as AuditCategory) ||
+      entry.category === ("navigation" as AuditCategory) ||
+      (entry.category as string) === "system"
+    ) {
+      return;
+    }
+
     await ensureAuditTable();
 
     let ip = entry.ipAddress;
@@ -173,6 +181,9 @@ export async function getAuditLogs(filter: AuditFilter = {}): Promise<{ logs: Au
   if (filter.category && filter.category !== "all") {
     where.push("category = ?");
     params.push(filter.category);
+  } else {
+    // Only fetch valid categories: auth, settings, content, users, records, export
+    where.push("category IN ('auth', 'settings', 'content', 'users', 'records', 'export')");
   }
 
   if (filter.action && filter.action !== "all") {
@@ -216,16 +227,16 @@ export async function getAuditStats(): Promise<{
   adminLogins: number;
   failedLogins: number;
   changesCount: number;
-  clicksCount: number;
+  bookingsCount: number;
 }> {
   await ensureAuditTable();
   try {
-    const [totalRow, loginRow, failedRow, changesRow, clicksRow] = await Promise.all([
-      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs"),
+    const [totalRow, loginRow, failedRow, changesRow, bookingsRow] = await Promise.all([
+      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE category IN ('auth', 'settings', 'content', 'users', 'records', 'export')"),
       first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'admin.login_success'"),
       first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'admin.login_failed'"),
-      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE category IN ('settings', 'content', 'users', 'records')"),
-      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE category IN ('click', 'navigation')"),
+      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE category IN ('settings', 'content', 'users')"),
+      first<{ n: number }>("SELECT COUNT(*) AS n FROM audit_logs WHERE category = 'records'"),
     ]);
 
     return {
@@ -233,7 +244,7 @@ export async function getAuditStats(): Promise<{
       adminLogins: loginRow?.n ?? 0,
       failedLogins: failedRow?.n ?? 0,
       changesCount: changesRow?.n ?? 0,
-      clicksCount: clicksRow?.n ?? 0,
+      bookingsCount: bookingsRow?.n ?? 0,
     };
   } catch {
     return {
@@ -241,7 +252,7 @@ export async function getAuditStats(): Promise<{
       adminLogins: 0,
       failedLogins: 0,
       changesCount: 0,
-      clicksCount: 0,
+      bookingsCount: 0,
     };
   }
 }

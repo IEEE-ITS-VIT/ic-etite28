@@ -64,15 +64,27 @@ export function Flash({ ok, error }: { ok?: string | string[]; error?: string | 
   const errMsg = Array.isArray(error) ? error[0] : error;
   if (!okMsg && !errMsg) return null;
   return (
-    <div
-      role={errMsg ? "alert" : "status"}
-      className={`mb-5 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${
-        errMsg ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"
-      }`}
-    >
-      {errMsg ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
-      <span>{errMsg ?? okMsg}</span>
-    </div>
+    <>
+      <div
+        role={errMsg ? "alert" : "status"}
+        className={`mb-5 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${
+          errMsg ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"
+        }`}
+      >
+        {errMsg ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+        <span>{errMsg ?? okMsg}</span>
+      </div>
+
+      {/* Floating toast to guarantee visibility regardless of scroll position */}
+      <div
+        className={`fixed top-4 right-4 z-50 max-w-md shadow-2xl rounded-2xl border px-4 py-3 text-sm font-semibold flex items-center gap-3 backdrop-blur-md pointer-events-none transition-all duration-300 ${
+          errMsg ? "border-red-300 bg-red-900/90 text-white shadow-red-950/20" : "border-emerald-300 bg-emerald-900/90 text-white shadow-emerald-950/20"
+        }`}
+      >
+        {errMsg ? <AlertCircle className="h-5 w-5 shrink-0 text-red-300" /> : <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-300" />}
+        <span>{errMsg ?? okMsg}</span>
+      </div>
+    </>
   );
 }
 

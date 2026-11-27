@@ -202,18 +202,18 @@ export default function Footer({
               {/* Co-Located Flagship Events */}
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
                 <p className="text-[11px] text-brand-accent font-bold uppercase tracking-wider"><E f="c.Footer">{"Co-Located Flagship Events"}</E></p>
-                <div className="flex items-center gap-3 pt-0.5">
+                <div className="flex items-center gap-3 pt-1">
                   {visibility.technext && (
-                  <a href={technextUrl} title="TechNext '28 Industrial Expo" className="hover:opacity-85 transition-opacity">
-                    <div className="relative h-6 w-24">
-                      <Image src="/logos/technext-logo.png" alt="TechNext '28" fill sizes="100px" className="object-contain object-left" />
+                  <a href={technextUrl} title="TechNext '28 Industrial Expo" className="inline-flex items-center justify-center h-8 w-28 bg-white/10 rounded-xl px-2.5 py-1.5 border border-[#F37021]/50 hover:bg-white/15 transition-all">
+                    <div className="relative h-4 w-full">
+                      <Image src="/logos/technext-logo.png" alt="TechNext '28" fill sizes="90px" className="object-contain object-center" />
                     </div>
                   </a>
                   )}
                   {visibility.bolt && (
-                  <a href={boltUrl} title="BOLT 3.0 National Hackathon" className="hover:opacity-85 transition-opacity">
-                    <div className="relative h-6 w-20">
-                      <Image src="/logos/bolt-logo-white.png" alt="BOLT 3.0" fill sizes="80px" className="object-contain object-left" />
+                  <a href={boltUrl} title="BOLT 3.0 National Hackathon" className="inline-flex items-center justify-center h-8 w-28 bg-white/10 rounded-xl px-2.5 py-1.5 border border-[#CCFF00]/40 hover:bg-white/15 transition-all">
+                    <div className="relative h-4 w-full">
+                      <Image src="/logos/bolt-logo-white.png" alt="BOLT 3.0" fill sizes="90px" className="object-contain object-center" />
                     </div>
                   </a>
                   )}

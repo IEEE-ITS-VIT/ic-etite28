@@ -18,20 +18,17 @@ function actionBadge(action: string, category: string) {
   if (category === "settings") {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Settings Change</span>;
   }
+  if (category === "content") {
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800">Content Change</span>;
+  }
   if (category === "users") {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">User Change</span>;
   }
   if (category === "records") {
-    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">Record Update</span>;
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">Booking / Record</span>;
   }
   if (category === "export") {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">Data Export</span>;
-  }
-  if (category === "click") {
-    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Click</span>;
-  }
-  if (category === "navigation") {
-    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Page View</span>;
   }
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">{action}</span>;
 }
@@ -110,7 +107,7 @@ export default async function AdminAuditPage({
   return (
     <PortalPage
       title="Audit logs"
-      subtitle="Complete trail of admin logins, configuration changes, user edits, and clicks across sites."
+      subtitle="Complete trail of admin logins, configuration changes, user edits, and stall bookings."
       width="max-w-7xl"
     >
       <Flash ok={ok} error={error} />
@@ -120,7 +117,7 @@ export default async function AdminAuditPage({
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Events</p>
           <p className="text-2xl font-black text-brand-primary mt-1">{stats.totalEvents.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-0.5">All tracked admin activity</p>
+          <p className="text-xs text-slate-400 mt-0.5">Logins, changes & bookings</p>
         </div>
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Admin Logins</p>
@@ -130,12 +127,12 @@ export default async function AdminAuditPage({
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Admin Changes</p>
           <p className="text-2xl font-black text-blue-600 mt-1">{stats.changesCount.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Settings, users & records</p>
+          <p className="text-xs text-slate-400 mt-0.5">Settings, content & users</p>
         </div>
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Clicks & Navigation</p>
-          <p className="text-2xl font-black text-amber-600 mt-1">{stats.clicksCount.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Page views & interactions</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Bookings & Records</p>
+          <p className="text-2xl font-black text-indigo-600 mt-1">{stats.bookingsCount.toLocaleString()}</p>
+          <p className="text-xs text-slate-400 mt-0.5">Stall & attendee records</p>
         </div>
       </div>
 
@@ -159,15 +156,14 @@ export default async function AdminAuditPage({
                 placeholder="Search email, IP, action, details..."
                 className={`${small} !w-56`}
               />
-              <select name="category" defaultValue={category} className={`${small} !w-36`}>
+              <select name="category" defaultValue={category} className={`${small} !w-44`}>
                 <option value="">All categories</option>
                 <option value="auth">Auth & Logins</option>
                 <option value="settings">Settings / CMS</option>
+                <option value="content">Page Content</option>
                 <option value="users">Users & Roles</option>
-                <option value="records">Records & Bookings</option>
-                <option value="click">Clicks</option>
-                <option value="navigation">Page Views</option>
-                <option value="export">Exports</option>
+                <option value="records">Bookings & Registrations</option>
+                <option value="export">Data Exports</option>
               </select>
               <select name="site" defaultValue={site} className={`${small} !w-32`}>
                 <option value="">All sites</option>
@@ -198,40 +194,27 @@ export default async function AdminAuditPage({
                   month: "short",
                   hour: "2-digit",
                   minute: "2-digit",
-                  second: "2-digit",
                 });
-
                 return (
-                  <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                    <Td className="whitespace-nowrap text-xs text-slate-600 font-mono">
-                      {timeFormatted}
+                  <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                    <Td className="whitespace-nowrap text-xs text-slate-500 font-mono">{timeFormatted}</Td>
+                    <Td>
+                      <div className="font-semibold text-slate-900 leading-snug">{log.user_name || "—"}</div>
+                      <div className="text-xs text-slate-500 font-mono">{log.user_email || "System / Anonymous"}</div>
                     </Td>
-                    <Td className="whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-900">
-                          {log.user_name || log.user_email || "Anonymous"}
-                        </span>
-                        {log.user_email && log.user_name && (
-                          <span className="text-xs text-slate-500">{log.user_email}</span>
-                        )}
+                    <Td>
+                      <div className="space-y-1">
+                        {actionBadge(log.action, log.category)}
+                        <div className="text-[11px] text-slate-400 font-mono">{log.action}</div>
                       </div>
                     </Td>
+                    <Td className="whitespace-nowrap">{siteBadge(log.site)}</Td>
+                    <Td className="max-w-md">
+                      <div className="text-xs text-slate-700 break-words leading-relaxed">{formatDetails(log.details)}</div>
+                    </Td>
+                    <Td className="whitespace-nowrap text-xs text-slate-500 font-mono">{log.path || "—"}</Td>
                     <Td className="whitespace-nowrap">
-                      {actionBadge(log.action, log.category)}
-                    </Td>
-                    <Td className="whitespace-nowrap">
-                      {siteBadge(log.site)}
-                    </Td>
-                    <Td className="max-w-xs truncate">
-                      <span className="text-xs text-slate-700 block truncate" title={log.details || ""}>
-                        {formatDetails(log.details)}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap font-mono text-xs text-slate-500">
-                      {log.path || "—"}
-                    </Td>
-                    <Td className="whitespace-nowrap font-mono text-xs text-slate-600">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700">
                         {log.ip_address || "—"}
                       </span>
                     </Td>
@@ -244,26 +227,23 @@ export default async function AdminAuditPage({
 
         {/* ── Pagination ── */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-200 pt-4 mt-4 px-2">
-            <span className="text-xs text-slate-500">
-              Showing {offset + 1}–{Math.min(offset + pageSize, total)} of {total} events
-            </span>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 mt-4">
+            <p className="text-xs text-slate-500">
+              Showing page <span className="font-bold">{pageNum}</span> of <span className="font-bold">{totalPages}</span> ({total} events)
+            </p>
+            <div className="flex gap-2">
               {pageNum > 1 && (
                 <Link
-                  href={`/admin/audit?${new URLSearchParams({ ...exportParams, page: String(pageNum - 1) }).toString()}`}
-                  className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50"
+                  href={`/admin/audit?page=${pageNum - 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}${site ? `&site=${site}` : ""}`}
+                  className="px-3 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                 >
                   Previous
                 </Link>
               )}
-              <span className="text-xs font-medium text-slate-600">
-                Page {pageNum} of {totalPages}
-              </span>
               {pageNum < totalPages && (
                 <Link
-                  href={`/admin/audit?${new URLSearchParams({ ...exportParams, page: String(pageNum + 1) }).toString()}`}
-                  className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50"
+                  href={`/admin/audit?page=${pageNum + 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}${site ? `&site=${site}` : ""}`}
+                  className="px-3 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                 >
                   Next
                 </Link>

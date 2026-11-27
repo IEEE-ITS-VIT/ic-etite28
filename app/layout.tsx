@@ -72,8 +72,11 @@ export const metadata: Metadata = {
     "BOLT hackathon",
   ],
   icons: {
-    icon: "/assets/icetite-logo.jpeg",
-    apple: "/assets/icetite-logo.jpeg",
+    icon: [
+      { url: "/favicon.ico?v=4", sizes: "any" },
+      { url: "/icon.png?v=4", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-icon.png?v=4", sizes: "180x180" }],
   },
   category: "conference",
   authors: [{ name: "Vellore Institute of Technology (VIT), Vellore" }],

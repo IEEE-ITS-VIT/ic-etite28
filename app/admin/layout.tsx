@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { requireAdmin } from "@/lib/auth/session";
 import { portalMetadata } from "@/lib/seo";
 import { SITE, SITE_NAME, type SiteKey } from "@/lib/site";
-import AdminAuditTracker from "@/components/admin/AdminAuditTracker";
+import AdminScrollPreserver from "@/components/admin/AdminScrollPreserver";
 
 export const metadata = portalMetadata("Admin");
 
@@ -47,7 +47,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const user = await requireAdmin("/admin");
   return (
     <div className="bg-[#F4F6FA]">
-      <AdminAuditTracker />
+      <AdminScrollPreserver />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto px-4 py-2.5 sm:px-6">
           <span className="mr-2 shrink-0 rounded-full bg-brand-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-accent">{SITE_NAME} admin</span>
