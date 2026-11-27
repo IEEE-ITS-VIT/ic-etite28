@@ -50,19 +50,32 @@ function siteBadge(site: string) {
 }
 
 function formatDetails(details: string | null) {
-  if (!details) return "—";
+  if (!details) return <span className="text-slate-400 font-mono">—</span>;
   try {
     const obj = JSON.parse(details);
     if (typeof obj === "object" && obj !== null) {
-      if (obj.label) return String(obj.label);
-      if (obj.reason) return `${obj.reason} (${obj.attemptedEmail || ""})`;
-      return Object.entries(obj)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(", ");
+      if (obj.label && Object.keys(obj).length === 1) {
+        return <span className="font-semibold text-slate-800 text-xs">{String(obj.label)}</span>;
+      }
+      return (
+        <div className="flex flex-wrap gap-1.5 py-0.5 max-w-lg">
+          {Object.entries(obj).map(([k, v]) => (
+            <span
+              key={k}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100/90 text-[11px] font-mono text-slate-700 border border-slate-200/80 leading-normal"
+            >
+              <span className="font-semibold text-slate-500">{k}:</span>
+              <span className="break-all font-medium text-slate-900">
+                {typeof v === "object" ? JSON.stringify(v) : String(v)}
+              </span>
+            </span>
+          ))}
+        </div>
+      );
     }
-    return details;
+    return <span className="break-all text-xs font-mono text-slate-700">{details}</span>;
   } catch {
-    return details;
+    return <span className="break-all text-xs text-slate-700">{details}</span>;
   }
 }
 
@@ -185,43 +198,45 @@ export default async function AdminAuditPage({
           <Empty>No audit log events found matching the criteria.</Empty>
         ) : (
           <Table head={["Time (IST)", "Admin User", "Action", "Site", "Details", "Path", "IP Address"]}>
-            <tbody className="divide-y divide-slate-100 text-sm bg-white">
-              {logs.map((log) => {
-                const date = new Date(log.created_at);
-                const timeFormatted = date.toLocaleString("en-IN", {
-                  timeZone: "Asia/Kolkata",
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                return (
-                  <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
-                    <Td className="whitespace-nowrap text-xs text-slate-500 font-mono">{timeFormatted}</Td>
-                    <Td>
-                      <div className="font-semibold text-slate-900 leading-snug">{log.user_name || "—"}</div>
-                      <div className="text-xs text-slate-500 font-mono">{log.user_email || "System / Anonymous"}</div>
-                    </Td>
-                    <Td>
-                      <div className="space-y-1">
-                        {actionBadge(log.action, log.category)}
-                        <div className="text-[11px] text-slate-400 font-mono">{log.action}</div>
-                      </div>
-                    </Td>
-                    <Td className="whitespace-nowrap">{siteBadge(log.site)}</Td>
-                    <Td className="max-w-md">
-                      <div className="text-xs text-slate-700 break-words leading-relaxed">{formatDetails(log.details)}</div>
-                    </Td>
-                    <Td className="whitespace-nowrap text-xs text-slate-500 font-mono">{log.path || "—"}</Td>
-                    <Td className="whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700">
-                        {log.ip_address || "—"}
-                      </span>
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
+            {logs.map((log) => {
+              const date = new Date(log.created_at);
+              const timeFormatted = date.toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                  <Td className="whitespace-nowrap text-xs text-slate-600 font-mono w-32">{timeFormatted}</Td>
+                  <Td className="min-w-[180px]">
+                    <div className="font-semibold text-slate-900 leading-snug">{log.user_name || "—"}</div>
+                    <div className="text-xs text-slate-500 font-mono break-all">{log.user_email || "System / Anonymous"}</div>
+                  </Td>
+                  <Td className="min-w-[160px]">
+                    <div className="space-y-1">
+                      {actionBadge(log.action, log.category)}
+                      <div className="text-[11px] text-slate-400 font-mono">{log.action}</div>
+                    </div>
+                  </Td>
+                  <Td className="whitespace-nowrap w-24">{siteBadge(log.site)}</Td>
+                  <Td className="min-w-[240px] max-w-lg">
+                    {formatDetails(log.details)}
+                  </Td>
+                  <Td className="whitespace-nowrap text-xs text-slate-500 font-mono max-w-[160px]">
+                    <div className="truncate" title={log.path || undefined}>
+                      {log.path || "—"}
+                    </div>
+                  </Td>
+                  <Td className="whitespace-nowrap w-32">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200/60">
+                      {log.ip_address || "—"}
+                    </span>
+                  </Td>
+                </tr>
+              );
+            })}
           </Table>
         )}
 

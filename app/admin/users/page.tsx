@@ -75,18 +75,24 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   </Td>
                   <Td className="whitespace-nowrap text-xs">{fmtIst(u.created_at)}</Td>
                   <Td>
-                    <form action={setUserRoleAction} className="flex gap-1.5">
-                      <input type="hidden" name="user_id" value={u.id} />
-                      <input type="hidden" name="q" value={q} />
-                      <select name="role" defaultValue={u.role} className={`${small} !w-32`}>
-                        <option value="participant">participant</option>
-                        <option value="evaluator">evaluator</option>
-                        <option value="admin">admin</option>
-                      </select>
-                      <SubmitButton className={btnSecondary} pendingText="…">
-                        Set
-                      </SubmitButton>
-                    </form>
+                    {u.email.toLowerCase() === "ieeeitsvitscore@gmail.com" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-xs">
+                        ★ Default Superadmin (Permanent)
+                      </span>
+                    ) : (
+                      <form action={setUserRoleAction} className="flex gap-1.5">
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <input type="hidden" name="q" value={q} />
+                        <select name="role" defaultValue={u.role} className={`${small} !w-32`}>
+                          <option value="participant">participant</option>
+                          <option value="evaluator">evaluator</option>
+                          <option value="admin">admin</option>
+                        </select>
+                        <SubmitButton className={btnSecondary} pendingText="…">
+                          Set
+                        </SubmitButton>
+                      </form>
+                    )}
                   </Td>
                   <Td>
                     {!u.email_verified && (

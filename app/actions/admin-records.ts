@@ -173,6 +173,10 @@ export async function setUserRoleAction(fd: FormData) {
     const userId = str(fd, "user_id", 40);
     const role = str(fd, "role", 20);
     if (!["participant", "evaluator", "admin"].includes(role)) throw new PortalError("Invalid role.");
+    const target = await first<{ email: string }>("SELECT email FROM users WHERE id = ?", [userId]);
+    if (target && target.email.toLowerCase() === "ieeeitsvitscore@gmail.com") {
+      throw new PortalError("ieeeitsvitscore@gmail.com is the permanent default Superadmin. Its role cannot be changed.");
+    }
     if (userId === admin.id && role !== "admin") throw new PortalError("You cannot remove your own admin access.");
     await batch(setRoleStatements(userId, role as Role));
     try {
@@ -222,6 +226,9 @@ export async function inviteUserAction(fd: FormData) {
     const name = str(fd, "name", 100);
     const role = str(fd, "role", 20) === "admin" ? "admin" : "evaluator";
     if (!isEmail(email)) throw new PortalError("Enter a valid email.");
+    if (email === "ieeeitsvitscore@gmail.com") {
+      throw new PortalError("ieeeitsvitscore@gmail.com is already the permanent default Superadmin.");
+    }
     const existing = await first<{ id: string; name: string }>("SELECT id, name FROM users WHERE email = ?", [email]);
     if (existing) {
       await batch(setRoleStatements(existing.id, role));
