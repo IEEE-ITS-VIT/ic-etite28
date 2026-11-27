@@ -23,10 +23,11 @@ export async function guarded(path: string, fn: () => Promise<string | void>, su
     unstable_rethrow(err);
     if (err instanceof PortalError) flash(path, "error", err.message);
     console.error(err);
-    if (err instanceof Error && /Database is not configured|D1 error|fetch failed/.test(err.message)) {
+    if (err instanceof Error && /Database is not configured|fetch failed|connect ECONNREFUSED|Failed to communicate with database gateway|TimeoutError|AbortError/.test(err.message)) {
       flash(path, "error", "The portal can't reach its database right now. Please try again in a few minutes.");
     }
-    flash(path, "error", "Something went wrong. Please try again.");
+    const msg = err instanceof Error ? err.message.replace(/^D1 error:\s*/i, "") : "Something went wrong. Please try again.";
+    flash(path, "error", msg || "Something went wrong. Please try again.");
   }
   const target = typeof successPath === "function" ? successPath() : successPath;
   if (ok) flash(target, "ok", ok);

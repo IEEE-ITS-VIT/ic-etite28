@@ -41,7 +41,7 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
     const status = str(fd, "status", 20);
     if (!["pending", "confirmed", "cancelled"].includes(status)) throw new PortalError("Invalid status.");
     const before = await first<{ status: string; payment_status: string; email: string; full_name: string; payment_amount: number; payment_currency: string }>(
-      "SELECT status, payment_status, email, full_name, payment_amount, payment_currency FROM conference_registrations WHERE id = ?",
+      "SELECT c.status, c.payment_status, c.payment_amount, c.payment_currency, u.email, u.name AS full_name FROM conference_registrations c JOIN users u ON u.id = c.user_id WHERE c.id = ?",
       [id]
     );
     if (!before) throw new PortalError("Registration not found.");
@@ -110,7 +110,7 @@ export async function processRefundAction(fd: FormData) {
 
     if (purpose === "conference") {
       const c = await first<{ id: string; full_name: string; email: string; payment_status: string; payment_amount: number; payment_currency: string }>(
-        "SELECT id, full_name, email, payment_status, payment_amount, payment_currency FROM conference_registrations WHERE id = ?",
+        "SELECT c.id, c.payment_status, c.payment_amount, c.payment_currency, u.email, u.name AS full_name FROM conference_registrations c JOIN users u ON u.id = c.user_id WHERE c.id = ?",
         [id]
       );
       if (!c) throw new PortalError("Conference registration not found.");

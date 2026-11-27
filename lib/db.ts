@@ -25,7 +25,7 @@ async function call<T>(path: "/query" | "/batch", body: unknown, retries = 2): P
         headers: { "content-type": "application/json", authorization: `Bearer ${GATEWAY_SECRET}` },
         body: JSON.stringify(body),
         cache: "no-store",
-        signal: AbortSignal.timeout(8000), // 8s timeout to prevent hung connection
+        signal: AbortSignal.timeout(15000), // 15s timeout to prevent hung connection
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
       if (!res.ok) {
