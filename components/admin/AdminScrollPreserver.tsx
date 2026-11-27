@@ -58,22 +58,11 @@ function ScrollPreserverInner() {
         // Only restore if saved within recent 15 minutes
         if (!isNaN(top) && age < 15 * 60 * 1000) {
           isRestoring.current = true;
-          // Restore immediately
           window.scrollTo({ top, behavior: "instant" });
-
-          // Also re-apply over consecutive frames in case of dynamic layout or hydration shifts
-          const timer1 = setTimeout(() => window.scrollTo({ top, behavior: "instant" }), 20);
-          const timer2 = setTimeout(() => window.scrollTo({ top, behavior: "instant" }), 80);
-          const timer3 = setTimeout(() => {
+          requestAnimationFrame(() => {
             window.scrollTo({ top, behavior: "instant" });
             isRestoring.current = false;
-          }, 200);
-
-          return () => {
-            clearTimeout(timer1);
-            clearTimeout(timer2);
-            clearTimeout(timer3);
-          };
+          });
         }
       }
     } catch {}

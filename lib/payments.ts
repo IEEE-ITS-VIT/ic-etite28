@@ -14,9 +14,9 @@ import { SITE_URL } from "@/lib/seo";
 //            once VIT shares the API contract; everything else already routes through here.
 
 export type PaymentPurpose = "conference" | "technext" | "event";
-export type PaymentStatus = "not_required" | "unpaid" | "pending" | "paid" | "waived" | "failed";
+export type PaymentStatus = "not_required" | "unpaid" | "pending" | "paid" | "waived" | "failed" | "refunded";
 
-export const PAYMENT_STATUSES: PaymentStatus[] = ["not_required", "unpaid", "pending", "paid", "waived", "failed"];
+export const PAYMENT_STATUSES: PaymentStatus[] = ["not_required", "unpaid", "pending", "paid", "waived", "failed", "refunded"];
 
 const TABLES: Record<PaymentPurpose, { table: string; key: string }> = {
   conference: { table: "conference_registrations", key: "id" },

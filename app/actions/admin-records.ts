@@ -40,6 +40,28 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
   await guarded(back, async () => {
     const status = str(fd, "status", 20);
     if (!["pending", "confirmed", "cancelled"].includes(status)) throw new PortalError("Invalid status.");
+    const before = await first<{ status: string; payment_status: string; email: string; full_name: string; payment_amount: number; payment_currency: string }>(
+      "SELECT status, payment_status, email, full_name, payment_amount, payment_currency FROM conference_registrations WHERE id = ?",
+      [id]
+    );
+    if (!before) throw new PortalError("Registration not found.");
+
+    const pay = payment(fd);
+
+    // Rule 1: If once payment is paid and confirmed through API no one can edit
+    if (before.payment_status === "paid" && pay !== "paid") {
+      throw new PortalError("This registration is paid and confirmed. Payment status is locked and cannot be changed manually (use the Refund action if authorized).");
+    }
+    if (before.payment_status === "refunded" && pay !== "refunded") {
+      throw new PortalError("This registration has been refunded and its payment status cannot be altered.");
+    }
+
+    // Rule 2: If API is configured the payment status cannot be changed manually
+    const settings = await getSettings();
+    if (settings.payments.provider === "vit" && before.payment_status !== "paid" && pay === "paid") {
+      throw new PortalError("Payment API is configured. Payment status is updated automatically through the gateway callback and cannot be manually marked as paid.");
+    }
+
     await run("UPDATE conference_registrations SET status = ?, admin_notes = ?, payment_link = ?, updated_at = ? WHERE id = ?", [
       status,
       str(fd, "admin_notes", 1000) || null,
@@ -47,7 +69,6 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
       now(),
       id,
     ]);
-    const pay = payment(fd);
     await applyPaymentStatus("conference", id, pay, str(fd, "payment_ref", 120) || null);
     try {
       const { logAudit } = await import("@/lib/audit");
@@ -62,6 +83,84 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
       });
     } catch {}
     return pay === "paid" ? "Saved. If this was a new payment, the invoice was issued and emailed." : "Registration updated.";
+  });
+}
+
+export async function processRefundAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const purpose = str(fd, "purpose", 20) as "technext" | "conference" | "event";
+  const id = str(fd, "id", 60);
+  const password = str(fd, "refund_password", 100);
+  const reason = str(fd, "refund_reason", 300) || "Authorized refund";
+  const back = str(fd, "back", 200) || (purpose === "technext" ? "/admin/technext" : purpose === "conference" ? "/admin/conference" : "/admin/events");
+
+  await guarded(back, async () => {
+    if (!password) {
+      throw new PortalError("Refund authorization password is required.");
+    }
+    const { hasRefundPassword, verifyRefundPassword } = await import("@/lib/refund");
+    const configured = await hasRefundPassword();
+    if (!configured) {
+      throw new PortalError("Refund security password has not been configured yet. Please configure it in the ieeeitsvitscore@gmail.com profile first.");
+    }
+    const valid = await verifyRefundPassword(password);
+    if (!valid) {
+      throw new PortalError("Incorrect refund authorization password. Refund rejected.");
+    }
+
+    if (purpose === "conference") {
+      const c = await first<{ id: string; full_name: string; email: string; payment_status: string; payment_amount: number; payment_currency: string }>(
+        "SELECT id, full_name, email, payment_status, payment_amount, payment_currency FROM conference_registrations WHERE id = ?",
+        [id]
+      );
+      if (!c) throw new PortalError("Conference registration not found.");
+      if (c.payment_status !== "paid") {
+        throw new PortalError("Only successfully paid registrations can be refunded.");
+      }
+
+      await run(
+        `UPDATE conference_registrations
+         SET payment_status = 'refunded',
+             status = 'cancelled',
+             admin_notes = COALESCE(admin_notes || '\n', '') || ?,
+             updated_at = ?
+         WHERE id = ?`,
+        [`[REFUNDED on ${new Date().toISOString()} by ${admin.email}] Reason: ${reason}`, now(), id]
+      );
+
+      await run("UPDATE payments SET status = 'refunded', updated_at = ? WHERE purpose = 'conference' AND ref_id = ?", [now(), id]).catch(() => {});
+
+      try {
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit({
+          userId: admin.id,
+          userEmail: admin.email,
+          userName: admin.name,
+          action: "records.refund_processed",
+          category: "records",
+          path: "/admin/conference",
+          details: { purpose: "conference", registrationId: id, amount: c.payment_amount, currency: c.payment_currency, reason },
+        });
+      } catch {}
+
+      try {
+        const { notify } = await import("@/lib/notifications");
+        const { formatMoney } = await import("@/lib/settings");
+        await notify("payment_received", {
+          to: c.email,
+          name: c.full_name,
+          scope: "conference",
+          vars: {
+            item: `ic-ETITE'28 Conference Registration (REFUNDED - ${reason})`,
+            amount: formatMoney(c.payment_amount, c.payment_currency),
+            invoiceNumber: "REFUNDED",
+            paymentRef: "REFUND-PROCESSED",
+          },
+        });
+      } catch {}
+    }
+
+    return "Refund processed successfully. Record marked as refunded and status updated.";
   });
 }
 

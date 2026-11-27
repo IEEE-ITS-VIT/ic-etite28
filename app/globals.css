@@ -45,8 +45,18 @@ h1, h2, h3, h4, h5, h6 {
 
 
 /* ── Startup animation styles ───────────────────────── */
-#intro-overlay:not(.active) {
-  display: none !important;
+html.show-intro {
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+html.show-intro body {
+  overflow: hidden !important;
+}
+#intro-overlay {
+  display: none;
+}
+html.show-intro #intro-overlay {
+  display: flex !important;
 }
 #intro-overlay.active {
   display: flex !important;

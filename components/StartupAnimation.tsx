@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 
 export default function StartupAnimation() {
-  const [active, setActive] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -11,18 +11,33 @@ export default function StartupAnimation() {
     initialized.current = true;
 
     try {
-      // Check if intro animation has already been shown in this browser session
       const alreadyShown = sessionStorage.getItem("icetite28_intro_seen");
+      const isHome = window.location.pathname === "/" && !window.location.search.includes("cms_preview");
 
-      // Only the home page plays the intro; login and every other page open straight away.
-      if (!alreadyShown && window.location.pathname === "/" && !window.location.search.includes("cms_preview")) {
-        // First page opening in this session: trigger animation!
+      if (!alreadyShown && isHome) {
+        document.documentElement.classList.add("show-intro");
+        document.body.style.overflow = "hidden";
         sessionStorage.setItem("icetite28_intro_seen", "1");
-        setActive(true);
+
+        const timer = setTimeout(() => {
+          document.documentElement.classList.remove("show-intro");
+          document.body.style.overflow = "";
+          setDismissed(true);
+        }, 3800);
+
+        return () => {
+          clearTimeout(timer);
+          document.documentElement.classList.remove("show-intro");
+          document.body.style.overflow = "";
+        };
+      } else {
+        document.documentElement.classList.remove("show-intro");
+        document.body.style.overflow = "";
+        setDismissed(true);
       }
     } catch {
-      // If sessionStorage is unavailable or blocked, don't show
-      setActive(false);
+      document.documentElement.classList.remove("show-intro");
+      setDismissed(true);
     }
 
     // Expose a global replay trigger for manual testing (window.restartIntro())
@@ -30,8 +45,14 @@ export default function StartupAnimation() {
       try {
         sessionStorage.removeItem("icetite28_intro_seen");
       } catch {}
-      setActive(false);
-      setTimeout(() => setActive(true), 50);
+      setDismissed(false);
+      document.documentElement.classList.add("show-intro");
+      document.body.style.overflow = "hidden";
+      setTimeout(() => {
+        document.documentElement.classList.remove("show-intro");
+        document.body.style.overflow = "";
+        setDismissed(true);
+      }, 3800);
     };
 
     (window as unknown as { restartIntro?: () => void }).restartIntro = replay;
@@ -42,27 +63,7 @@ export default function StartupAnimation() {
     };
   }, []);
 
-  // Lock scroll and dismiss overlay after animation completes (~3.75s)
-  useEffect(() => {
-    if (!active) return;
-
-    document.documentElement.classList.add("show-intro");
-    document.body.style.overflow = "hidden";
-
-    const timer = setTimeout(() => {
-      document.documentElement.classList.remove("show-intro");
-      document.body.style.overflow = "";
-      setActive(false);
-    }, 3800);
-
-    return () => {
-      clearTimeout(timer);
-      document.documentElement.classList.remove("show-intro");
-      document.body.style.overflow = "";
-    };
-  }, [active]);
-
-  if (!active) {
+  if (dismissed) {
     return null;
   }
 
@@ -75,8 +76,6 @@ export default function StartupAnimation() {
         inset: 0,
         zIndex: 99999,
         background: "#f7f7f7",
-        display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",

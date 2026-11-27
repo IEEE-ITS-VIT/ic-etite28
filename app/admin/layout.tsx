@@ -47,6 +47,22 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const user = await requireAdmin("/admin");
   return (
     <div className="bg-[#F4F6FA]">
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+                var y = sessionStorage.getItem('admin_scroll_y');
+                var t = sessionStorage.getItem('admin_scroll_time');
+                if (y && t && (Date.now() - parseInt(t, 10) < 900000)) {
+                  window.scrollTo(0, parseFloat(y));
+                }
+              } catch(e) {}
+            })();
+          `,
+        }}
+      />
       <AdminScrollPreserver />
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto px-4 py-2.5 sm:px-6">

@@ -130,6 +130,7 @@ const STATUS_TONE: Record<string, keyof typeof BADGE_TONES> = {
   failed: "red",
   rejected: "red",
   cancelled: "red",
+  refunded: "purple",
   archived: "slate",
 };
 

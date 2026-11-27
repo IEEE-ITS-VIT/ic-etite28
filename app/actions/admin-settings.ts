@@ -49,13 +49,11 @@ function prizes(fd: FormData, prefix: string): Prize[] {
     .map((r) => ({ title: r.get("title", 100), amount: money(r.get("amount", 20)), description: r.get("desc", 300) }));
 }
 
-// Public pages read settings through a cached getter; refresh the pages that show them.
+// Public pages read settings through a cached getter (getSettings has tag "settings");
+// revalidateTag immediately invalidates the cached settings with zero server lag.
 function refreshPublic() {
-  for (const p of ["/", "/important-dates", "/registration", "/call-for-papers", "/hackathon", "/technext", "/admin/settings", "/admin/content"]) {
-    try { revalidatePath(p); } catch {}
-  }
-  try { revalidatePath("/", "layout"); } catch {}
   try { revalidateTag("settings"); } catch {}
+  try { revalidatePath("/", "page"); } catch {}
 }
 
 export async function saveDatesAction(fd: FormData) {

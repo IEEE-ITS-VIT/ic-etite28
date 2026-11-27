@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { all } from "@/lib/db";
-import { formatMoney } from "@/lib/settings";
+import { formatMoney, getSettings } from "@/lib/settings";
 import { fmtIst } from "@/lib/portal/actions";
 import { PAYMENT_STATUSES } from "@/lib/payments";
-import { updateConferenceRegistrationAction } from "@/app/actions/admin-records";
+import { processRefundAction, updateConferenceRegistrationAction } from "@/app/actions/admin-records";
 import ScopeTools from "@/components/admin/ScopeTools";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Card, Empty, Flash, PortalPage, Stat, StatusBadge, Table, Td, btnSecondary, inputCls } from "@/components/portal/ui";
@@ -12,6 +12,7 @@ const small = `${inputCls} !py-1.5 !text-sm`;
 
 export default async function AdminConferencePage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; q?: string }> }) {
   const { ok, error, q } = await searchParams;
+  const settings = await getSettings();
   const like = q ? `%${q}%` : null;
   const rows = await all<{
     id: string;
@@ -114,13 +115,29 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
                         <option key={s}>{s}</option>
                       ))}
                     </select>
-                    <select name="payment_status" defaultValue={r.payment_status} className={small} aria-label="Payment status">
-                      {PAYMENT_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s.replace("_", " ")}
-                        </option>
-                      ))}
-                    </select>
+                    {r.payment_status === "paid" ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-800 border border-green-200">
+                          ✓ Paid (Locked)
+                        </span>
+                        <input type="hidden" name="payment_status" value="paid" />
+                      </div>
+                    ) : r.payment_status === "refunded" ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                          Refunded
+                        </span>
+                        <input type="hidden" name="payment_status" value="refunded" />
+                      </div>
+                    ) : (
+                      <select name="payment_status" defaultValue={r.payment_status} className={small} aria-label="Payment status">
+                        {PAYMENT_STATUSES.filter((s) => s !== "paid" || settings.payments.provider !== "vit").map((s) => (
+                          <option key={s} value={s}>
+                            {s.replace("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <input name="payment_ref" defaultValue={r.payment_ref ?? ""} placeholder="Ref / UTR" className={small} />
                     <input name="payment_link" type="url" defaultValue={r.payment_link ?? ""} placeholder="Payment link" className={small} />
                     <input name="admin_notes" defaultValue={r.admin_notes ?? ""} placeholder="Internal note" className={`${small} col-span-2`} />
@@ -132,6 +149,29 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
                       <StatusBadge status={r.payment_status} />
                     </div>
                   </form>
+
+                  {r.payment_status === "paid" && (
+                    <details className="mt-2 rounded-lg border border-rose-200 bg-rose-50/60 p-2.5">
+                      <summary className="cursor-pointer text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center justify-between">
+                        <span>Refund Registration</span>
+                        <span className="text-[10px] font-normal text-rose-600">ieeeitsvitscore Password</span>
+                      </summary>
+                      <form action={processRefundAction} className="mt-2 space-y-2 pt-2 border-t border-rose-200/80">
+                        <input type="hidden" name="purpose" value="conference" />
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="back" value={`/admin/conference#r-${r.id}`} />
+                        <input name="refund_password" type="password" required className={`${small} !bg-white`} placeholder="Refund authorization password" />
+                        <input name="refund_reason" type="text" className={`${small} !bg-white`} placeholder="Refund reason (optional)" />
+                        <SubmitButton
+                          className="!bg-rose-600 hover:!bg-rose-700 text-white !py-1 !px-2.5 !text-xs font-bold rounded"
+                          pendingText="Refunding…"
+                          confirm={`Refund ${formatMoney(r.payment_amount, r.payment_currency)} to ${r.name}?`}
+                        >
+                          Confirm Refund
+                        </SubmitButton>
+                      </form>
+                    </details>
+                  )}
                 </Td>
               </tr>
             ))}

@@ -318,3 +318,24 @@ export async function changePasswordAction(formData: FormData) {
     flash("/dashboard/profile", "ok", "Password changed.");
   });
 }
+
+export async function setRefundPasswordAction(formData: FormData) {
+  await guarded("/dashboard/profile", async () => {
+    const user = await getCurrentUser();
+    if (!user) redirect("/login");
+    if (user.email.toLowerCase() !== "ieeeitsvitscore@gmail.com") {
+      throw new PortalError("Unauthorized. Only ieeeitsvitscore@gmail.com can configure the refund security password.");
+    }
+    const pw = String(formData.get("refund_password") ?? "").trim();
+    const confirm = String(formData.get("confirm_refund_password") ?? "").trim();
+    if (!pw || pw.length < 8) {
+      throw new PortalError("Refund authorization password must be at least 8 characters.");
+    }
+    if (pw !== confirm) {
+      throw new PortalError("Passwords do not match. Please re-enter.");
+    }
+    const { setRefundPassword } = await import("@/lib/refund");
+    await setRefundPassword(pw, user.email, user.id);
+    return "Refund authorization password saved securely as hash.";
+  });
+}
