@@ -1,24 +1,21 @@
-import { randomBytes, createHash, randomInt } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 
 export const newId = () => randomBytes(12).toString("base64url");
 
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
-// Team codes avoid look-alike characters (0/O, 1/I/L) using cryptographically secure random distribution.
+// Team codes avoid look-alike characters (0/O, 1/I/L).
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export function newCode(length = 6): string {
+  const bytes = randomBytes(length);
   let out = "";
-  for (let i = 0; i < length; i++) {
-    out += CODE_ALPHABET[randomInt(0, CODE_ALPHABET.length)];
-  }
+  for (let i = 0; i < length; i++) out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
   return out;
 }
 
-// Cryptographically secure, unbiased numeric OTP code generation.
 export function newNumericCode(length = 6): string {
-  const min = 0;
-  const max = 10 ** length;
-  return randomInt(min, max).toString().padStart(length, "0");
+  const n = randomBytes(4).readUInt32BE(0) % 10 ** length;
+  return n.toString().padStart(length, "0");
 }
 
 export function slugify(value: string): string {

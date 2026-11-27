@@ -7,6 +7,7 @@ import { first, now, run } from "@/lib/db";
 import { sha256 } from "@/lib/portal/ids";
 import { SITE } from "@/lib/site";
 import { roleSql } from "@/lib/auth/roles";
+import { getCache, setCache, deleteCache } from "@/lib/cache/redis";
 
 export type Role = "participant" | "evaluator" | "admin";
 
@@ -55,7 +56,11 @@ export async function createSession(userId: string) {
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await run("DELETE FROM sessions WHERE id = ?", [sha256(token)]).catch(() => {});
+  if (token) {
+    const hash = sha256(token);
+    void deleteCache(`sess:${hash}`).catch(() => {});
+    await run("DELETE FROM sessions WHERE id = ?", [hash]).catch(() => {});
+  }
   jar.delete(SESSION_COOKIE);
   jar.delete(LOGGED_IN_COOKIE);
 }
@@ -68,12 +73,22 @@ export async function destroyAllSessions(userId: string) {
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return first<SessionUser>(
+  const hash = sha256(token);
+  const cacheKey = `sess:${hash}`;
+  const cachedUser = await getCache<SessionUser>(cacheKey);
+  if (cachedUser) return cachedUser;
+
+  const user = await first<SessionUser>(
     `SELECT u.id, u.email, u.name, ${roleSql("u")} AS role, u.phone, u.institution, u.department, u.year_of_study, u.city, u.email_verified
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > ?`,
-    [sha256(token), now()]
+    [hash, now()]
   ).catch(() => null);
+
+  if (user) {
+    void setCache(cacheKey, user, 45).catch(() => {});
+  }
+  return user;
 });
 
 export async function requireUser(next?: string): Promise<SessionUser> {

@@ -183,7 +183,7 @@ export default async function RootLayout({
                   url: "https://www.ieee.org",
                 },
               ],
-            }).replace(/</g, "\\u003c"),
+            }),
           }}
         />
       </head>

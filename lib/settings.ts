@@ -2,6 +2,7 @@ import "server-only";
 import { SITE, SITES, siteKey } from "@/lib/site";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { all, isDbConfigured, now, run } from "@/lib/db";
+import { getCache, setCache, deleteCache } from "@/lib/cache/redis";
 import { importantDatesData } from "@/data/dates";
 import { registrationFeesData } from "@/data/registration";
 import { NO_EARLY_BIRD, type EarlyBird, type Prize } from "@/lib/pricing";
@@ -300,6 +301,10 @@ export type SettingsKey = keyof Settings;
 
 async function loadSettings(): Promise<Settings> {
   if (!isDbConfigured()) return DEFAULT_SETTINGS;
+  const cacheKey = `settings:${SITE}`;
+  const cachedSettings = await getCache<Settings>(cacheKey);
+  if (cachedSettings) return cachedSettings;
+
   try {
     const rows = await all<{ key: string; value: string }>("SELECT key, value FROM settings");
     const merged: Settings = structuredClone(DEFAULT_SETTINGS);
@@ -314,6 +319,7 @@ async function loadSettings(): Promise<Settings> {
       (merged as unknown as Record<string, unknown>)[k] =
         base && typeof base === "object" && !Array.isArray(base) ? { ...base, ...value } : value;
     }
+    void setCache(cacheKey, merged, 600).catch(() => {});
     return merged;
   } catch (err) {
     console.error("Failed to load settings, using defaults", err);
@@ -321,7 +327,7 @@ async function loadSettings(): Promise<Settings> {
   }
 }
 
-export const getSettings = unstable_cache(loadSettings, ["site-settings"], { tags: ["settings"], revalidate: 60 });
+export const getSettings = unstable_cache(loadSettings, ["site-settings"], { tags: ["settings"], revalidate: 600 });
 
 export async function saveSetting<K extends SettingsKey>(key: K, value: Settings[K], userId: string) {
   await run(
@@ -330,6 +336,7 @@ export async function saveSetting<K extends SettingsKey>(key: K, value: Settings
     [siteKey(key), JSON.stringify(value), now(), userId]
   );
   revalidateTag("settings");
+  void deleteCache(`settings:${SITE}`).catch(() => {});
 
   try {
     const { logAudit } = await import("@/lib/audit");

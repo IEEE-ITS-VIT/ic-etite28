@@ -45,10 +45,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
   // Certificates from admin Excel batches, matched to this login's (verified) email.
   const batchCerts = await all<{ id: string; batch_id: string; title: string; event_label: string | null }>(
     `SELECT r.id, r.batch_id, b.title, b.event_label FROM certificate_batch_recipients r
-       JOIN certificate_batches b ON b.id = r.batch_id AND b.site = ?
+       JOIN certificate_batches b ON b.id = r.batch_id AND b.site = '${SITE}'
        JOIN certificate_templates t ON t.scope = 'batch:' || b.id AND t.released = 1
       WHERE r.email = ? ORDER BY b.created_at DESC`,
-    [SITE, user.email]
+    [user.email]
   );
   const invoices = await all<{ id: string; number: string; amount: number; currency: string; issued_at: string; items: string }>(
     `SELECT id, number, amount, currency, issued_at, items FROM invoices WHERE user_id = ? AND purpose IN (${SITES[SITE].payments.map(() => "?").join(",")}) ORDER BY seq DESC`,

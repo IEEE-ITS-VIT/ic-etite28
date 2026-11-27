@@ -150,6 +150,24 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
         createdAt,
       ]
     );
+
+    // Non-blocking Kafka event streaming
+    try {
+      const { publishKafkaEvent } = await import("@/lib/queue/kafka");
+      void publishKafkaEvent("portal-audit-events", entry.action, {
+        id,
+        site,
+        userId,
+        userEmail,
+        userName,
+        action: entry.action,
+        category: entry.category,
+        details: detailsStr,
+        ip,
+        path: entry.path,
+        createdAt,
+      }).catch(() => {});
+    } catch {}
   } catch (err) {
     // Audit logging must be fail-safe and never block core operations
     console.error("Failed to write audit log:", err);
