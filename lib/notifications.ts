@@ -15,7 +15,8 @@ export type NotificationKey =
   | "event_registered"
   | "team_created"
   | "team_joined"
-  | "payment_received";
+  | "payment_received"
+  | "refund_processed";
 
 export interface NotificationTemplate {
   enabled: boolean;
@@ -104,6 +105,16 @@ export const NOTIFICATION_DEFS: Record<NotificationKey, { label: string; when: s
       body: `Dear {{name}},\n\nWe have received your payment of {{amount}} for {{item}}.\n\nInvoice number: {{invoiceNumber}}\nPayment reference: {{paymentRef}}\n\nThe invoice is attached and can also be downloaded from your dashboard:\n{{portalUrl}}\n\nThank you,\n${SITE_NAME} Organising Committee`,
     },
   },
+  refund_processed: {
+    label: "Refund processed",
+    when: "An authorized admin processes a refund for a registration or booking.",
+    placeholders: ["name", "amount", "reason", "portalUrl"],
+    defaults: {
+      enabled: true,
+      subject: "Refund processed for your booking / registration",
+      body: `Dear {{name}},\n\nYour refund of {{amount}} has been authorized and processed.\n\nDetails / Reason: {{reason}}\n\nYour associated registration or booking has been marked as cancelled.\n\nRegards,\n${SITE_NAME} Organising Committee`,
+    },
+  },
 };
 
 export const NOTIFICATION_KEYS = Object.keys(NOTIFICATION_DEFS) as NotificationKey[];
@@ -149,7 +160,8 @@ export async function notify(key: NotificationKey, targets: NotifyTarget | Notif
         attachment: t.attachment ?? null,
       });
       await run(insert.sql, insert.params);
-      await processOutbox(1, insert.params[0] as string).catch(() => {});
+      // Non-blocking outbox processing: dispatch in background so the save/update action responds instantly
+      void processOutbox(1, insert.params[0] as string).catch(() => {});
     }
   } catch (err) {
     console.error(`notify(${key}) failed`, err);

@@ -9,6 +9,7 @@ export const metadata = portalMetadata("Admin");
 
 const COMMON_END = [
   { href: "/admin/invoices", label: "Invoices" },
+  { href: "/admin/refunds", label: "Refunds" },
   { href: "/admin/certificates", label: "Certificates (Excel)" },
   { href: "/admin/users", label: "Users & roles" },
   { href: "/admin/audit", label: "Audit logs" },
