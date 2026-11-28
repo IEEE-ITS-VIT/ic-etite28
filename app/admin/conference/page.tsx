@@ -3,7 +3,7 @@ import { all } from "@/lib/db";
 import { formatMoney, getSettings } from "@/lib/settings";
 import { fmtIst } from "@/lib/portal/actions";
 import { PAYMENT_STATUSES } from "@/lib/payments";
-import { processRefundAction, updateConferenceRegistrationAction } from "@/app/actions/admin-records";
+import { deleteConferenceRegistrationAction, processRefundAction, updateConferenceRegistrationAction } from "@/app/actions/admin-records";
 import ScopeTools from "@/components/admin/ScopeTools";
 import SubmitButton from "@/components/portal/SubmitButton";
 import { Card, Empty, Flash, PortalPage, Stat, StatusBadge, Table, Td, btnSecondary, inputCls } from "@/components/portal/ui";
@@ -190,6 +190,33 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
                         </SubmitButton>
                       </form>
                     </details>
+                  )}
+
+                  {r.payment_status === "refunded" && (
+                    <div className="mt-2.5 rounded-xl border border-red-200 bg-red-50/80 p-2.5">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-red-900">Registration Refunded</span>
+                          <span className="text-[10px] font-semibold text-red-700 bg-red-100 px-1.5 py-0.5 rounded border border-red-200">
+                            Eligible for Deletion
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-red-700 leading-tight">
+                          Delete this refunded record to allow the delegate to submit a fresh registration.
+                        </p>
+                        <form action={deleteConferenceRegistrationAction} className="pt-1">
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="back" value="/admin/conference" />
+                          <SubmitButton
+                            className="w-full !bg-red-700 hover:!bg-red-800 !text-white !py-1.5 !px-3 !text-xs font-bold rounded-lg shadow-sm"
+                            pendingText="Deleting…"
+                            confirm={`Permanently delete refunded registration for ${r.name} (${r.email})? This action cannot be undone and will allow the user to register again.`}
+                          >
+                            Delete &amp; Allow Re-registration
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    </div>
                   )}
                 </Td>
               </tr>

@@ -86,6 +86,67 @@ export async function updateConferenceRegistrationAction(fd: FormData) {
   });
 }
 
+export async function deleteConferenceRegistrationAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 60);
+  const back = str(fd, "back", 200) || "/admin/conference";
+
+  await guarded(back, async () => {
+    const reg = await first<{
+      id: string;
+      user_id: string;
+      status: string;
+      payment_status: string;
+      email: string;
+      full_name: string;
+    }>(
+      `SELECT c.id, c.user_id, c.status, c.payment_status, u.email, u.name AS full_name
+       FROM conference_registrations c
+       JOIN users u ON u.id = c.user_id
+       WHERE c.id = ?`,
+      [id]
+    );
+
+    if (!reg) {
+      throw new PortalError("Registration not found.");
+    }
+
+    // Safety rule: delete only permitted if registration has been refunded
+    if (reg.payment_status !== "refunded") {
+      throw new PortalError("Deletion is restricted: Only refunded registrations can be deleted to allow re-registration.");
+    }
+
+    // Delete associated payments and visa letter records if any
+    await run("DELETE FROM visa_letters WHERE registration_id = ?", [id]).catch(() => {});
+    await run("DELETE FROM payments WHERE purpose = 'conference' AND ref_id = ?", [id]).catch(() => {});
+
+    // Delete the conference registration record
+    await run("DELETE FROM conference_registrations WHERE id = ?", [id]);
+
+    try {
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit({
+        userId: admin.id,
+        userEmail: admin.email,
+        userName: admin.name,
+        action: "conference.registration_deleted",
+        category: "records",
+        path: "/admin/conference",
+        details: {
+          registrationId: id,
+          userId: reg.user_id,
+          userEmail: reg.email,
+          userName: reg.full_name,
+          paymentStatus: reg.payment_status,
+          status: reg.status,
+        },
+      });
+    } catch {}
+
+    return `Refunded registration for ${reg.full_name} (${reg.email}) has been deleted. The user may now re-register.`;
+  });
+}
+
 export async function processRefundAction(fd: FormData) {
   const admin = await requireAdmin();
   const purpose = str(fd, "purpose", 20) as "technext" | "conference" | "event";

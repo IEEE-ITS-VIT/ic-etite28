@@ -5,6 +5,7 @@ import { formatInr } from "@/lib/settings";
 import { fmtIst } from "@/lib/portal/actions";
 import { hasRefundPassword, getAllRefundableRecords, REFUND_SUPERADMIN_EMAIL } from "@/lib/refund";
 import { setRefundPasswordAction, proceedRefundAction, cancelRefundRequestAction } from "@/app/actions/admin-refunds";
+import { deleteConferenceRegistrationAction } from "@/app/actions/admin-records";
 import { Card, Empty, Flash, PortalPage, Stat, StatusBadge, Table, Td, inputCls } from "@/components/portal/ui";
 import SubmitButton from "@/components/portal/SubmitButton";
 
@@ -273,9 +274,24 @@ export default async function AdminRefundsPage({
 
               <Td>
                 {r.isRefunded ? (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
-                    <Lock className="h-3.5 w-3.5 text-purple-600 shrink-0" />
-                    <span>Refunded (Locked &amp; Permanent)</span>
+                  <div className="flex flex-col gap-2 items-start">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
+                      <Lock className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                      <span>Refunded</span>
+                    </div>
+                    {r.purpose === "conference" && (
+                      <form action={deleteConferenceRegistrationAction}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="back" value="/admin/refunds" />
+                        <SubmitButton
+                          className="!bg-red-600 hover:!bg-red-700 !text-white !px-2.5 !py-1 !text-xs font-bold rounded-lg shadow-xs"
+                          pendingText="Deleting…"
+                          confirm={`Permanently delete refunded registration for ${r.title}? This will allow the user to register again.`}
+                        >
+                          Delete &amp; Allow Re-registration
+                        </SubmitButton>
+                      </form>
+                    )}
                   </div>
                 ) : r.canProceedRefund ? (
                   <div className="flex flex-wrap items-center gap-2">
