@@ -17,6 +17,20 @@ import { SITE_URL } from "@/lib/seo";
 
 // ─── Conference registration ──────────────────────────────────────────
 
+let columnsEnsured = false;
+async function ensureRegistrationColumns() {
+  if (columnsEnsured) return;
+  try {
+    await run("ALTER TABLE conference_registrations ADD COLUMN identity_proof_type TEXT").catch(() => {});
+    await run("ALTER TABLE conference_registrations ADD COLUMN identity_proof_number TEXT").catch(() => {});
+    await run("ALTER TABLE conference_registrations ADD COLUMN institution_id_number TEXT").catch(() => {});
+    await run("ALTER TABLE conference_registrations ADD COLUMN department TEXT").catch(() => {});
+    columnsEnsured = true;
+  } catch {
+    // Columns may already exist
+  }
+}
+
 export async function saveConferenceRegistrationAction(fd: FormData) {
   const back = "/registration/apply";
   const user = await requireUser(back);
@@ -42,49 +56,185 @@ export async function saveConferenceRegistrationAction(fd: FormData) {
         ? priceNow(tier.usd, tier.earlyUsd, settings.conference.earlyBird, pricedAt).amount
         : priceNow(tier.inr, tier.earlyInr, settings.conference.earlyBird, pricedAt).amount;
     if (amount == null) throw new PortalError(`"${tier.category}" is not available for ${residency === "foreign" ? "foreign" : "Indian"} delegates.`);
-    const ieee = bool(fd, "ieee_member");
-    const ieeeNumber = str(fd, "ieee_number", 20);
-    if (tier.isIeeeDiscount && (!ieee || !/^\d{6,12}$/.test(ieeeNumber))) throw new PortalError("IEEE member categories need a valid IEEE membership number.");
+
+    // Identity verification
+    const identityProofType = str(fd, "identity_proof_type", 60) || (residency === "foreign" ? "Passport" : "Indian Identity (Aadhaar / Govt ID)");
+    const identityProofNumber = str(fd, "identity_proof_number", 80).trim();
+    if (!identityProofNumber) {
+      if (residency === "foreign") {
+        throw new PortalError("Foreign delegates must provide a valid passport number.");
+      } else {
+        throw new PortalError("Indian delegates must provide a valid identity proof (Aadhaar / Voter ID / Govt ID number).");
+      }
+    }
+
+    // Category and IEEE identification
+    const isIeeeCategory = Boolean(
+      tier.isIeeeDiscount ||
+      /ieee/i.test(tier.category) ||
+      str(fd, "category", 60).toLowerCase().includes("ieee")
+    );
+    const isVit = /vit/i.test(tier.category) || str(fd, "category", 60).toLowerCase().includes("vit");
+    const isStudent = /student|scholar/i.test(tier.category);
+
+    const ieee = isIeeeCategory ? 1 : (bool(fd, "ieee_member") ? 1 : 0);
+    const ieeeNumber = str(fd, "ieee_number", 30).trim();
+    if (isIeeeCategory) {
+      if (!ieeeNumber || !/^\d{6,12}$/.test(ieeeNumber.replace(/\s+/g, ""))) {
+        throw new PortalError("IEEE member categories require a valid 6-12 digit IEEE membership number.");
+      }
+    }
+
+    // Institutional / Academic ID
+    const institutionIdNumber = str(fd, "institution_id_number", 80).trim();
+    if (!institutionIdNumber) {
+      if (isVit) {
+        throw new PortalError("VIT internal delegates must enter their VIT Employee ID or Student Registration Number.");
+      } else if (isStudent) {
+        throw new PortalError("Students and scholars must enter their College Roll Number or Student Registration Number.");
+      } else {
+        throw new PortalError("Please enter your College Roll No. / Employee ID / Institutional ID.");
+      }
+    }
+
+    // Branch / Department
+    const department = str(fd, "department", 100).trim();
+    if (isVit && !department) {
+      throw new PortalError("VIT internal delegates must specify their Branch / School / Department (e.g. SCOPE, SENSE, SELECT).");
+    }
+
     const affiliation = str(fd, "affiliation", 200);
     const country = str(fd, "country", 80) || (residency === "indian" ? "India" : "");
     if (!affiliation) throw new PortalError("Affiliation is required.");
     if (!country) throw new PortalError("Country is required.");
+
     const paperIds = str(fd, "paper_ids", 200);
-    const presenting = bool(fd, "presenting_author");
+    const presenting = str(fd, "presenting_author", 10) === "1" || str(fd, "presenting_author", 10) === "yes" || bool(fd, "presenting_author");
     if (presenting && !paperIds) throw new PortalError("Presenting authors must enter their CMT paper ID(s).");
 
     const currency = residency === "foreign" ? "USD" : "INR";
-    const values = [
-      tier.key,
-      tier.category,
-      residency,
-      ieee ? 1 : 0,
-      ieee ? ieeeNumber || null : null,
-      affiliation,
-      str(fd, "designation", 100) || null,
-      country,
-      paperIds || null,
-      str(fd, "paper_titles", 1000) || null,
-      presenting ? 1 : 0,
-      amount,
-      currency,
-      amount > 0 ? "unpaid" : "not_required",
-      now(),
-    ];
+    await ensureRegistrationColumns();
+
     if (existing) {
-      await run(
-        `UPDATE conference_registrations SET category_key=?, category_label=?, residency=?, ieee_member=?, ieee_number=?, affiliation=?, designation=?, country=?,
-           paper_ids=?, paper_titles=?, presenting_author=?, payment_amount=?, payment_currency=?, payment_status=?, updated_at=? WHERE id=?`,
-        [...values, existing.id]
-      );
+      try {
+        await run(
+          `UPDATE conference_registrations SET category_key=?, category_label=?, residency=?, ieee_member=?, ieee_number=?, affiliation=?, designation=?, country=?,
+             paper_ids=?, paper_titles=?, presenting_author=?, payment_amount=?, payment_currency=?, payment_status=?,
+             identity_proof_type=?, identity_proof_number=?, institution_id_number=?, department=?, updated_at=? WHERE id=?`,
+          [
+            tier.key,
+            tier.category,
+            residency,
+            ieee,
+            ieee ? ieeeNumber || null : null,
+            affiliation,
+            str(fd, "designation", 100) || null,
+            country,
+            paperIds || null,
+            str(fd, "paper_titles", 1000) || null,
+            presenting ? 1 : 0,
+            amount,
+            currency,
+            amount > 0 ? "unpaid" : "not_required",
+            identityProofType,
+            identityProofNumber,
+            institutionIdNumber,
+            department || null,
+            now(),
+            existing.id,
+          ]
+        );
+      } catch {
+        const meta = `\n[ID: ${identityProofType} ${identityProofNumber} | Reg/Emp: ${institutionIdNumber} | Dept: ${department || ""}]`;
+        await run(
+          `UPDATE conference_registrations SET category_key=?, category_label=?, residency=?, ieee_member=?, ieee_number=?, affiliation=?, designation=?, country=?,
+             paper_ids=?, paper_titles=?, presenting_author=?, payment_amount=?, payment_currency=?, payment_status=?,
+             admin_notes = COALESCE(admin_notes, '') || ?, updated_at=? WHERE id=?`,
+          [
+            tier.key,
+            tier.category,
+            residency,
+            ieee,
+            ieee ? ieeeNumber || null : null,
+            affiliation,
+            str(fd, "designation", 100) || null,
+            country,
+            paperIds || null,
+            str(fd, "paper_titles", 1000) || null,
+            presenting ? 1 : 0,
+            amount,
+            currency,
+            amount > 0 ? "unpaid" : "not_required",
+            meta,
+            now(),
+            existing.id,
+          ]
+        );
+      }
       return "Registration updated.";
     }
-    await run(
-      `INSERT INTO conference_registrations (category_key, category_label, residency, ieee_member, ieee_number, affiliation, designation, country,
-         paper_ids, paper_titles, presenting_author, payment_amount, payment_currency, payment_status, updated_at, id, user_id, status, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
-      [...values, newId(), user.id, now()]
-    );
+
+    try {
+      await run(
+        `INSERT INTO conference_registrations (category_key, category_label, residency, ieee_member, ieee_number, affiliation, designation, country,
+           paper_ids, paper_titles, presenting_author, payment_amount, payment_currency, payment_status,
+           identity_proof_type, identity_proof_number, institution_id_number, department, updated_at, id, user_id, status, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
+        [
+          tier.key,
+          tier.category,
+          residency,
+          ieee,
+          ieee ? ieeeNumber || null : null,
+          affiliation,
+          str(fd, "designation", 100) || null,
+          country,
+          paperIds || null,
+          str(fd, "paper_titles", 1000) || null,
+          presenting ? 1 : 0,
+          amount,
+          currency,
+          amount > 0 ? "unpaid" : "not_required",
+          identityProofType,
+          identityProofNumber,
+          institutionIdNumber,
+          department || null,
+          now(),
+          newId(),
+          user.id,
+          now(),
+        ]
+      );
+    } catch {
+      const meta = `[ID: ${identityProofType} ${identityProofNumber} | Reg/Emp: ${institutionIdNumber} | Dept: ${department || ""}]`;
+      await run(
+        `INSERT INTO conference_registrations (category_key, category_label, residency, ieee_member, ieee_number, affiliation, designation, country,
+           paper_ids, paper_titles, presenting_author, payment_amount, payment_currency, payment_status,
+           admin_notes, updated_at, id, user_id, status, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
+        [
+          tier.key,
+          tier.category,
+          residency,
+          ieee,
+          ieee ? ieeeNumber || null : null,
+          affiliation,
+          str(fd, "designation", 100) || null,
+          country,
+          paperIds || null,
+          str(fd, "paper_titles", 1000) || null,
+          presenting ? 1 : 0,
+          amount,
+          currency,
+          amount > 0 ? "unpaid" : "not_required",
+          meta,
+          now(),
+          newId(),
+          user.id,
+          now(),
+        ]
+      );
+    }
     await notify("conference_registered", {
       to: user.email,
       name: user.name,

@@ -33,6 +33,10 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
     payment_currency: string;
     payment_ref: string | null;
     payment_link: string | null;
+    identity_proof_type?: string | null;
+    identity_proof_number?: string | null;
+    institution_id_number?: string | null;
+    department?: string | null;
     admin_notes: string | null;
     created_at: string;
   }>(
@@ -96,11 +100,26 @@ export default async function AdminConferencePage({ searchParams }: { searchPara
                   <div className="mt-1 text-xs text-slate-400">{fmtIst(r.created_at)}</div>
                 </Td>
                 <Td>
-                  {r.category_label}
+                  <div className="font-semibold text-slate-800">{r.category_label}</div>
                   <div className="text-xs text-slate-500">
                     {r.residency === "foreign" ? "Foreign" : "Indian"}
                     {r.ieee_member ? ` · IEEE ${r.ieee_number ?? ""}` : ""}
                   </div>
+                  {(r.identity_proof_number || r.institution_id_number) && (
+                    <div className="mt-1 text-[11px] text-slate-600 bg-slate-50 rounded px-1.5 py-0.5 border border-slate-200">
+                      {r.identity_proof_number && (
+                        <div>
+                          <span className="font-semibold text-slate-700">{r.identity_proof_type || "ID"}:</span> {r.identity_proof_number}
+                        </div>
+                      )}
+                      {r.institution_id_number && (
+                        <div>
+                          <span className="font-semibold text-slate-700">Reg/Emp ID:</span> {r.institution_id_number}
+                          {r.department ? ` (${r.department})` : ""}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Td>
                 <Td>
                   {r.paper_ids ?? "—"}

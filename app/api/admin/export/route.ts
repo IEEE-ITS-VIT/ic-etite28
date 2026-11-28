@@ -253,7 +253,7 @@ async function exportTechnext(zip: JSZip) {
 
 async function exportConference(zip: JSZip) {
   const rows = await all<Record<string, unknown>>(
-    `SELECT u.name, u.email, u.phone, c.category_label, c.residency, c.ieee_member, c.ieee_number, c.affiliation, c.designation, c.country,
+    `SELECT u.name, u.email, u.phone, c.category_label, c.residency, c.identity_proof_type, c.identity_proof_number, c.institution_id_number, c.department, c.ieee_member, c.ieee_number, c.affiliation, c.designation, c.country,
             c.paper_ids, c.paper_titles, c.presenting_author, c.status, c.payment_status, c.payment_amount, c.payment_currency, c.payment_ref,
             c.admin_notes, c.created_at
        FROM conference_registrations c JOIN users u ON u.id = c.user_id ORDER BY c.created_at`

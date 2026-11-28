@@ -78,6 +78,9 @@ export async function getConferenceRegistrationsSheet(): Promise<SheetDefinition
     payment_currency: string;
     payment_ref: string | null;
     payment_link: string | null;
+    identity_proof_type?: string | null;
+    identity_proof_number?: string | null;
+    institution_id_number?: string | null;
     created_at: string;
     updated_at: string;
   }>(
@@ -101,6 +104,9 @@ export async function getConferenceRegistrationsSheet(): Promise<SheetDefinition
     "Category Label",
     "Category Code",
     "Residency",
+    "Identity Proof Type",
+    "Identity Proof Number",
+    "College Roll / Emp ID",
     "IEEE Member",
     "IEEE Number",
     "Paper ID(s)",
@@ -132,6 +138,9 @@ export async function getConferenceRegistrationsSheet(): Promise<SheetDefinition
     r.category_label,
     r.category_key,
     r.residency === "foreign" ? "Foreign" : "Indian",
+    r.identity_proof_type ?? "",
+    r.identity_proof_number ?? "",
+    r.institution_id_number ?? "",
     r.ieee_member === 1 ? "Yes" : "No",
     r.ieee_number ?? "",
     r.paper_ids ?? "",
@@ -182,6 +191,9 @@ export async function getTechnextBookingsSheet(): Promise<SheetDefinition> {
     payment_currency: string;
     payment_ref: string | null;
     payment_link: string | null;
+    identity_proof_type?: string | null;
+    identity_proof_number?: string | null;
+    institution_id_number?: string | null;
     created_at: string;
     updated_at: string;
   }>("SELECT * FROM technext_bookings ORDER BY created_at DESC");
